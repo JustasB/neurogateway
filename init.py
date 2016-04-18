@@ -13,7 +13,7 @@ from allensdk.model.biophysical_perisomatic.utils import Utils
 from allensdk.model.biophys_sim.config import Config
 bp = BiophysicalPerisomaticApi('http://api.brain-map.org')
 
-    """
+"""
 
 import os
 import glob
@@ -21,10 +21,11 @@ import pickle
 from utils import Utils
 import numpy as np
 import pdb 
-config = Config().load('config.json')
+#config = Config().load('config.json')
 # The readin flag when set enables the wiring to be read in from pre-existing 
 # pickled files with rank specific file names.
-utils = Utils(config,NCELL=60,readin=0)
+from neuron import h
+utils = Utils(h,NCELL=60,readin=0)
 info_swc=utils.gcs(utils.NCELL)
 utils.wirecells()#wire cells on different hosts.
 utils.global_icm=utils.matrix_reduce(utils.icm)
