@@ -133,7 +133,6 @@ class Utils():
         bothtrans=[i for j,i in enumerate(markram) if "interneuron" in i ]
         bothtrans=[i for j,i in enumerate(markram) if not "interneuron" in i if (j>=2*(len(bothtrans)/3.0))and(j<self.NCELL)]
         return bothtrans
-(??)
             
     def make_cells(self,polarity):
         '''        Distribute cells across the hosts in a
