@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+
+
+
+.link {
+  stroke: #999;
+  stroke-opacity: .6;
+}
+
+.link {
+  stroke: #ccc;
+}
+
+.node text {
+  pointer-events: none;
+  font: 10px sans-serif;
+}
+
+
+
+
+</style>
+<body>
+ <div style="color:#0000FF">
+	<a href="index.html">
+		 Back to chord diagram layout of the network topology.
+	</a>
+</div>
+<div style="color:#0000FF">
+
+	<script src="//d3js.org/d3.v3.min.js"></script>
+	<script>
+	
+	var width = 960,
+		height = 500
+
+	var svg = d3.select("body").append("svg")
+		.attr("width", width)
+		.attr("height", height);
+
+	var force = d3.layout.force()
+		.gravity(0.05)
+		.distance(100)
+		.linkDistance(20)
+		.charge(-190)
+	//    .charge(-100)
+		.size([width, height]);
+
+	var color = d3.scale.category20();
+	var fill = d3.scale.category20();
+
+
+
+	d3.json('js/global_whole_network.json', function(error, json){
+	  if (error) throw error;
+	  //console.log(json);
+
+	  graph=json[3];
+	  var neurons = Object.keys(json[7]).map(function(key){ return json[7][key] }); //object with filenames and whether its excitatory or inhibitory
+ 
+	  for (var i=0; i<graph.nodes.length; ++i) {
+		   graph.nodes[i].name=neurons[i][0];
+		 }
+	
+	  force
+		  .nodes(graph.nodes)
+		  .links(graph.links)
+		  .on("tick", tick)
+		  .start();
+
+	  var link = svg.selectAll(".link")
+		  .data(graph.links)
+		.enter().append("line")
+		  .attr("class", "link");
+
+	  link.append("text")
+		  .attr("dx", 12)
+		  .attr("dy", ".35em")
+		  .text(function(d) { return d.name });
+
+
+
+	  var node = svg.selectAll(".node")
+		  .data(graph.nodes)
+		 .enter().append("circle")
+		 // .enter().append("g")
+ 		
+		  .attr("class", "node")
+		  //.attr("r", -18)
+	  
+		   .attr("x", -8)
+		  .attr("y", -8)
+		  .attr("width", 16)
+		  .attr("height", 16)
+	     //.style("fill", function(d) { return fill; })
+
+		  //.style("fill", function(d) { return color; })
+			.attr("cx", function(d) { return d.x; })
+			.attr("cy", function(d) { return d.y; })
+			.attr("r", 8)
+			
+			//Sort of assigns colour based on the divisibility of its index.
+			
+			
+			.style("fill", function(d, i) { return fill(i & 3); })
+			.style("stroke", function(d, i) { return d3.rgb(fill(i & 3)).darker(2); })
+			.call(force.drag)
+			.on("mousedown", function() { d3.event.stopPropagation(); });
+
+		  //.call(force.drag);	
+
+    //.on("mousedown", function() { d3.event.stopPropagation(); });
+
+			svg.style("opacity", 1e-6)
+			  .transition()
+				.duration(1000)
+				.style("opacity", 1);
+
+			d3.select("body")
+				.on("mousedown", mousedown);
+
+			function tick(e) {
+
+			  // Push different nodes in different directions for clustering.
+			  var k = 6 * e.alpha;
+			  graph.nodes.forEach(function(o, i) {
+				o.y += i & 1 ? k : -k;
+				o.x += i & 2 ? k : -k;
+			  });
+
+			  graph.links.forEach(function(o, i) {
+			  console.log(o)
+				o.y += i & 1 ? k : -k;
+				o.x += i & 2 ? k : -k;
+			  });
+
+			  node.attr("cx", function(d) { return d.x; })
+				  .attr("cy", function(d) { return d.y; });
+			}
+
+			function mousedown() {
+			  nodes.forEach(function(o, i) {
+				o.x += (Math.random() - .5) * 40;
+				o.y += (Math.random() - .5) * 40;
+			  });
+			  force.resume();
+			}
+
+	  /*node.append("image")
+		  .attr("xlink:href", "https://github.com/favicon.ico")
+
+	  */
+		node = node.data(graph.nodes, function(d) { return d.id; });
+
+	   var nodeEnter = node.enter().append("g")
+		  .attr("class", "node")
+		  //.on("click", click)
+		  //.call(force.drag);
+
+	
+  
+  
+	  node.select("circle")
+		  .style("fill", "#3182bd")
+  
+	  node.append("text")
+		  .attr("dx", 12)
+		  .attr("dy", ".35em")
+		  .text(function(d) { return d.name });
+
+	  force.on("tick", function() {
+		link.attr("x1", function(d) { return d.source.x; })
+			.attr("y1", function(d) { return d.source.y; })
+			.attr("x2", function(d) { return d.target.x; })
+			.attr("y2", function(d) { return d.target.y; });
+
+		//node.attr("cx", function(d) { return d.x; })
+		 //   .attr("cy", function(d) { return d.y; });
+		node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+	  });
+	});
+
+	</script>
+</div>

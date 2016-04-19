@@ -1,0 +1,609 @@
+/*This file contains two templates one for constructing morphologically accurate cells, another for simplified reduced cells.*/
+
+
+begintemplate Cell
+public polarity, cell_lai
+public compress_tree, prune_tree, prune_one, msd, clear_cell, dchan
+public soma, axon, dend, apic, contract_cell, cellInfol         
+create soma[1], axon[1], dend[1], apic[1]
+public all, somatic, axonal, basal, apical, position, synlist, compress_tree, unbranch_tree, ampalist, gabalist, noiselist, type, name, basketHIPP, ca1pyrHIPP, nametype, num_type, spk_trig_ls, spk_rx_ls 
+public nmdalist, population, reponame, gid1
+objref all, somatic, axonal, basal, apical, synlist, noiselist, ampalist, gabalist, nmdalist, spk_trig_ls, spk_rx_ls, contract_cell
+strdef name, nametype, population, reponame
+public div, conv, div1, conv1, msd, inimp0, inimp20, inimp100, spk_train, spk, spk_trainb, isil//Hz
+objref div, conv, spk_train, spk, spk_trainb, isil
+public recvec, recvec1
+public locateSites, getLongestBranch, getAbsSecIndex, gvpre, gvpost
+public all, somatic, apical, axonal, basal, nSecSoma, nSecApical, nSecBasal, nSecAxonal, nSecAll, nSecAxonalOrig, SecSyn, distribute_channels
+objref SecSyn, this, gvpre, gvpost, recvec, recvec1
+
+strdef tstr
+
+
+public stellate, pyractive
+public basket, pyr, pyr2, OLM, ch_height, connect2target
+//public fid, sumdend
+public lambda_f, geom_nseg
+
+proc init() {
+    all = new SectionList()
+    somatic = new SectionList()
+    axonal = new SectionList()
+    basal = new SectionList()
+    apical = new SectionList()
+    spk_trig_ls = new SectionList()
+    spk_rx_ls = new SectionList()
+    
+    synlist = new List()
+    gabalist = new List()
+    ampalist = new List()
+    nmdalist = new List()
+    noiselist=new List()
+    geom_nseg()
+    //pyr2()
+    
+    polarity=0
+    type=-1
+    num_type=0
+    inimp0=0
+    inimp20=0
+    inimp100=0
+    gid1=0
+    cell_lai=0
+    div= new Vector() //initialise these vectors to be zero, but same size as number of cells
+    conv=new Vector() 
+    gvpre=new Vector()
+    gvpost=new Vector()
+    spk=new Vector()
+    spk_train=new Vector()
+    isil = new Vector()
+    spk_trainb=new Vector()
+    recvec=new Vector()
+    recvec1=new Vector()
+    
+}
+
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(0.5), $o1)
+  nc.threshold = -10
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+
+
+func lambda_f() { local i, x1, x2, d1, d2, lam
+        if (n3d() < 2) {
+                return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
+        }
+// above was too inaccurate with large variation in 3d diameter
+// so now we use all 3-d points to get a better approximate lambda
+        x1 = arc3d(0)
+        d1 = diam3d(0)
+        lam = 0
+        for i=1, n3d()-1 {
+                x2 = arc3d(i)
+                d2 = diam3d(i)
+                lam += (x2 - x1)/sqrt(d1 + d2)
+                x1 = x2   d1 = d2
+        }
+        //  length of the section in units of lambda
+        lam *= sqrt(2) * 1e-5*sqrt(4*PI*$1*Ra*cm)
+
+        return L/lam
+}
+
+proc geom_nseg() {
+  //soma area(.5) // make sure diam reflects 3d points
+  forsec all { nseg = int((L/(0.1*lambda_f(100))+.9)/2)*2 + 1  }
+}
+
+proc position() { local i, x, y, z
+//For plotting the network volume the network should be inflated by scale factor 100. As this shows anatomically approximate positions.
+//For simulating a network. scale factors should be reduced. to 10 As it is workable and computationally efficient to contract space.
+//Since less voxels will be compared for distance in algorithm find_distances.
+
+    x = 10*$1  y = 10*$2  z = 10*$3 //Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+    forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+      pt3dchange(i, x+x3d(i),y+y3d(i), z+z3d(i), diam3d(i))
+    }//dend 
+}
+/*
+//A dumb method delete it from public and here entirely.
+
+
+//The idea behind compress tree is to unfold all of the dendrites and axons so they all form one vertical line.
+//First just make the radius constant for the whole tree then straighten out the branches.
+proc compress_tree() { local dd,i,nd 
+ forall { 
+  for i = 0,n3d()-1 {
+     dd = diam3d(i)
+          pt3dchange(i, $1)
+          print "Note diam changed for: ",secname()," 3Dpoint: ",i," former: ",dd    
+   } 
+ }
+ forall { area(0.5) }
+ define_shape()
+ print "Done!\tDiam was changed for: ",nd," points"
+
+ forall {if (L>10) {nseg=int(L/10)}}
+}
+
+
+
+proc prune_internal_distances() {local rmax, sx1, sy1, sz1, sx0, sy0, sz0 localobj syn_
+//This is a redundant method for pruning internal distances. It should be made public and moved to morph2
+//, gabablist, ampalist//, prng//, cnt_r  // now expects xyc coords as arguments
+   rmax=0 
+   strdef furtherest_sec
+   forsec $o1.all{
+
+      if (ismembrane("xtra")) { //its something about xtra that only has segment indexs 
+         for (x,0) {
+         sum+=n3d()
+
+          r = (sqrt((x_xtra(x) - $o1.soma[0].x_xtra)^2 + (y_xtra(x) - $o1.soma[0].y_xtra)^2 + (z_xtra(x) - $o1.soma[0].z_xtra)^2))
+          if(r>rmax){
+           rmax=r
+           furtherest_sec=secname()
+          }
+          
+
+      }
+      print furtherest_sec
+    }
+    delete_section(furtherest_sec)
+  }
+} 
+//prune_internal_distances(cells.o(1))
+
+
+proc distribute_channels()	{local dist,val,base,maxLength
+	base = $8
+	soma distance()
+	maxLength = getLongestBranch($s1)
+         
+	forsec $s1		{
+		if(0==strcmp($s2,"Ra")){
+			Ra = $8
+		} else {
+			for(x) {
+			if((x>0)&&(x<1)){
+				if ($3==3) {
+					dist = distance(x)
+				} else {
+					dist = distance(x)/maxLength
+				}
+				val = calculate_distribution($3,dist,$4,$5,$6,$7,$8)
+				sprint(tstr,"%s(%-5.10f) = %-5.10f",$s2,x,val)
+				execute(tstr)
+				//print tstr
+			}
+		}
+	}
+}
+}
+// $1 is the distribution type:
+//     0 linear, 1 sigmoid, 2 exponential
+//     3 step for absolute distance (in microns)
+func calculate_distribution()	{local value
+	if ($1==0)	{value = $3 + $2*$4}
+	if ($1==1) {value = $3 + ($4/(1+exp(($2-$5)/$6)))}
+  	if ($1==2) {value = $3 + $6*exp($4*($2-$5))}
+	if ($1==3) {
+		if (($2 > $5) && ($2 < $6)) {
+			value = $3
+		} else {
+			value = $4
+		}
+	}
+	value = value*$7
+	return value
+}
+
+// $s1 section
+func getLongestBranch(){local maxL,d localobj distallist,sref
+    sprint(tstr,"%s distance()",$s1)
+    execute(tstr,this)    
+    
+  	if(0==strcmp($s1,"axon")){
+      sprint(tstr,"%s[0] distance(1)",$s1)
+      execute(tstr,this)    
+  	}
+
+		maxL = 0
+		d = 0
+		distallist = new SectionList()
+		forsec $s1 {
+			sref = new SectionRef()
+			if (sref.nchild==0) distallist.append()
+		}
+		forsec distallist{
+			d = distance(1)
+			if(maxL<d) maxL = d
+		}
+		// for the soma case
+		if (maxL == 0) {
+      $s1 {
+        maxL = L
+      }
+    }
+		return maxL
+	}
+
+// $s1 section
+// $2 distance x in micrometers
+// return list of [1,2] vectors  - of the appropriate section and the location in each vector
+obfunc locateSites() {local maxL,site,d0,d1,siteX,i localobj vv,ll
+	ll = new List()
+
+  sprint(tstr,"%s distance()",$s1)
+  execute(tstr,this)    
+    
+	if(0==strcmp($s1,"axon")){
+    sprint(tstr,"%s[0] distance(1)",$s1)
+    execute(tstr,this)    
+	}
+
+	maxL = getLongestBranch($s1)
+	site = $2
+	i = 0
+	forsec $s1 {
+    if (distance(0) < distance(1)) {
+  		d0 = distance(0)
+  		d1 = distance(1)
+  	} else {
+  		d1 = distance(0)
+  		d0 = distance(1)
+  	}
+
+    if (site <= d1 && site >= d0) {
+      siteX = (site-d0)/(d1-d0)
+      secNum = i
+      vv = new Vector()
+      ll.append(vv.append(secNum,siteX))
+		}
+		i = i+1
+	}
+  return ll
+}
+proc prune_one(){ local cnt_a, cnt_d, i
+cnt_a=0
+cnt_d=0
+cnt_ax=0
+//Do this in iterations, not at all at once.
+//As this will alter the resistivity of the network as well.
+//What kind of filter is this cell/network?
+//use adjancency matrix to reconnect the somas.
+//forall issection("*.apic*.") { cnt_a+=1 }
+forall{ issection(".*apic.*") { cnt_a+=1 }}
+forall{ issection(".*dend.*") { cnt_d+=1 }}
+forall{ issection(".*axon.*") { cnt_ax+=1 }}
+
+//forall forsec basal { cnt_d+=1 }
+ i=0
+ //print cnt_d, cnt_a, cnt_ax, "cnt_d ,cnt_a"
+ if(cnt_a>2){//){
+ forall{
+   issection(".*apic.*") { 
+        i+=1
+     //   print secname()
+     //   print cnt_a, i, "cnt_a, i"
+
+        if(i==cnt_a){
+        //cnt_a-=1
+
+        delete_section()
+       }   
+     }
+   }
+ }
+ i=0
+ //print cnt_d, cnt_ax, "cnt_d cnt_a"
+ if(cnt_ax>10){//Deleting the last 10 segments can have unpredictable results because unknown number of parent nodes.
+ forall{
+   issection(".*axon.*") { 
+        i+=1
+       // print secname()
+  //      print cnt_ax, i, "cnt_ax, i"
+
+        if(i==cnt_ax){
+        //cnt_a-=1
+
+        delete_section()
+       }   
+     }
+   }
+ }
+ i=0
+ if(cnt_d>2){//1){
+   forall{
+      issection(".*dend.*") { 
+        i+=1
+       // print secname()
+       // print cnt_d, i, "cnt_d, i"
+        if(i==cnt_d){
+
+        //cnt_d-=1
+
+        delete_section()
+       }
+     } 
+    }
+  }
+//  print cnt_d, cnt_a
+}
+
+proc clear_cell(){ local cnt_a, cnt_d, cnt_ax, i
+ //for cells.o($1).all{
+ forall{
+   for(x,0){
+     for j=0,n3d()-1{
+          secname()
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }
+    }
+}
+ 
+ 
+proc msd(){ local cnt_a, cnt_d, cnt_ax, i
+//make cell dead. To be called from a cell object.
+//also used for clearing a cell.
+
+
+cnt_a=0
+cnt_d=0
+cnt_ax=0
+//Do this in iterations, not at all at once.
+//As this will alter the resistivity of the network as well.
+//What kind of filter is this cell/network?
+//use adjancency matrix to reconnect the somas.
+//forall issection("*.apic*.") { cnt_a+=1 }
+forall{ issection(".*apic.*") { cnt_a+=1 }}
+forall{ issection(".*dend.*") { cnt_d+=1 }}
+forall{ issection(".*axon.*") { cnt_ax+=1 }}
+
+
+ i=0
+
+ if(cnt_a>2){
+ forall{
+   issection(".*apic.*") { 
+        i+=1
+        if(i==cnt_a){
+         if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0 //set the weights to zero to render synapse useless.
+          
+     
+         }
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }   
+     }
+   }
+ }
+ i=0
+
+ if(cnt_ax>2){//Deleting the last 10 segments can have unpredictable results because unknown number of parent nodes.
+ forall{
+   issection(".*axon.*") { 
+        i+=1
+        if(i==cnt_ax){
+          if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0//set the weights to zero to render synapse useless.
+           
+     
+         }
+
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       
+       }   
+     }
+   }
+ }
+ i=0
+ if(cnt_d>2){
+   forall{
+      issection(".*dend.*") { 
+        i+=1
+        if(i==cnt_d){
+          if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0//set the weights to zero to render synapse useless.
+    
+     
+         }
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }
+     } 
+    }
+  }
+}
+
+
+
+proc prune_tree(){
+  for i=0,$1{
+    prune_one()
+  }
+} 
+ 
+ 
+
+
+
+
+proc unbranch_tree() { local dd,i,nd localobj strobj
+i=0
+strobj = new StringFunctions()
+ print "Checking tree"
+ print "Note: diam values less than 0.3um are set to 0.3um!!"
+ nd = 0
+ forall { 
+number=n3d()
+
+while(i<n3d()){ //why would I think these lists are created in the sequence distal most dendrite to proximal most dendrite. I want to prune distal to proximal.
+     print "i=", i, "n3d()=", n3d(), number
+     print secname()
+     if (issection(".*dend.*")){
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     }
+     ifr (issection(".*axon.*")){
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     }
+     if (issection(".*apic.*")){ 
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     } 
+     i+=1
+  }
+ }
+}
+
+
+proc check_tree() { local dd,i,nd
+ print "Checking tree"
+ print "Note: diam values less than 0.3um are set to 0.3um!!"
+ nd = 0
+ forall { 
+  for i = 1,n3d()-1 {
+     if (diam3d(i-1) > diam3d(i) + 1 ) { 
+         print "Jump diam + >  1um in: ",secname()," 3Dpoint: ",i,diam3d(i),diam3d(i-1)  
+     }
+     if (diam3d(i) > diam3d(i-1) + 1 ) { 
+         print "Jump diam - >  1um in: ",secname()," 3Dpoint: ",i,diam3d(i-1),diam3d(i)  
+     }
+  }
+ }
+ forall { 
+  for i = 0,n3d()-1 {
+     dd = diam3d(i)
+     if ( dd < 0.6 ) { 
+          pt3dchange(i, 0.3)
+     nd = nd+1        
+          print "Note diam changed to 0.3 for: ",secname()," 3Dpoint: ",i," former: ",dd
+      }
+     
+   } 
+ }
+ forall { area(0.5) }
+ define_shape()
+ print "Done!\tDiam was changed for: ",nd," points"
+
+ forall {if (L>10) {nseg=int(L/10)}}
+ 
+}
+*/
+
+
+
+
+endtemplate Cell
+
+// $s1 swc morphology file name
+// on exit the return object is a Cell instance with
+// the morpology specified by the $s1 file
+obfunc mkcell() { localobj import, morph, cell, nil
+    cell = new Cell()
+    morph = new Import3d_SWC_read()
+    morph.input($s1)
+    import = new Import3d_GUI(morph, 0)
+    execute("forall delete_section()", cell)
+    import.instantiate(cell)
+    if(object_id(cell)!=0){
+     cnts_=0
+     cntd_=0
+     cnta_=0 
+     
+     //A forall here, would be for the whole network.
+     //forsec cell.all is only for a cell.
+     forsec cell.all{//A cell with no soma or dendrite will prove to be useless. 
+            //These morphologies will be deleted from the collection.
+       for(x,0){
+         if(issection(".*soma.*")){
+           cnts_+=1
+           cell.spk_trig_ls.append(secname())   
+         }
+         if(issection(".*dend.*")){
+           cntd_+=1
+           cell.spk_rx_ls.append(secname()) 
+         }
+         if(issection(".*apic.*")){
+           cell.spk_rx_ls.append(secname())
+         }
+          if(issection(".*axon.*")){
+           cnta_+=1
+           cell.spk_trig_ls.append(secname())   
+           
+         }
+       }
+      }
+     
+     if((cnts_==0)||(cntd_==0)){ //delete cells that have zero soma and dendrite segments.
+        //print "efficatious?"
+        //quit()
+        strdef delete_morph_f
+        sprint(delete_morph_f,"%s%s","rm ",$s1)
+        system(delete_morph_f)
+
+        print "rejected, no soma, or no dendrite"
+        //will put call to quit() here later. To check if this executes.
+      }else if((cnts_!=0)&&(cntd_!=0)){
+        cell=cell
+      }else if(cnta_==0){
+        cell=nil
+      }
+ 
+     
+  
+   }else{
+     cell=nil
+   }
+   // cell.prune_tree(50)
+   return cell
+   cell.geom_nseg()
+     
+      
+}
+
+
+/*begintemplate gapjunction
+public g
+public setg, setcells, cell1, cell2
+objref con1, con2
+proc init() {
+    objref con1, con2
+    $o1.axon[$2] con1 = new Gap($6)
+    $o3.axon[$4] con2 = new Gap($7)
+    setpointer con1.vgap, $o3.axon[$4].v($7)
+    setpointer con2.vgap, $o1.axon[$2].v($6)
+    con1.g = $5
+    con2.g = $5
+}
+proc setg() { // change the gj conductance externally
+    con1.g = $1
+    con2.g = $1
+}
+proc setcells(){ //IDs of cells that are coupled
+    cell1=$1
+    cell2=$2
+}
+endtemplate gapjunction*/
+
+
+
+
+

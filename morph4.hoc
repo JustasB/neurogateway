@@ -1,0 +1,1340 @@
+/*This file contains two templates one for constructing morphologically accurate cells, another for simplified reduced cells.
+
+There is a problem in that the membrane mechanisms inserted do not match the mod, inc and h files in this git branch, if I make it so the code should run again
+
+*/
+
+/*begintemplate gapjunction
+public g
+public setg, setcells, cell1, cell2
+objref con1, con2
+proc init() {
+    objref con1, con2
+    $o1.axon[$2] con1 = new Gap($6)
+    $o3.axon[$4] con2 = new Gap($7)
+    setpointer con1.vgap, $o3.axon[$4].v($7)
+    setpointer con2.vgap, $o1.axon[$2].v($6)
+    con1.g = $5
+    con2.g = $5
+}
+proc setg() { // change the gj conductance externally
+    con1.g = $1
+    con2.g = $1
+}
+proc setcells(){ //IDs of cells that are coupled
+    cell1=$1
+    cell2=$2
+}
+endtemplate gapjunction*/
+
+
+begintemplate Cell
+public polarity, cell_lai
+public compress_tree, prune_tree, prune_one, msd, clear_cell, dchan
+public soma, axon, dend, apic, contract_cell, cellInfol         
+create soma[1], axon[1], dend[1], apic[1]
+public all, somatic, axonal, basal, apical, position, synlist, compress_tree, unbranch_tree, ampalist, gabalist, noiselist, type, name, basketHIPP, ca1pyrHIPP, nametype, num_type, spk_trig_ls, spk_rx_ls 
+public nmdalist, population, reponame, gid1
+objref all, somatic, axonal, basal, apical, synlist, noiselist, ampalist, gabalist, nmdalist, spk_trig_ls, spk_rx_ls, contract_cell
+strdef name, nametype, population, reponame
+public div, conv, div1, conv1, msd, inimp0, inimp20, inimp100, spk_train, spk, spk_trainb, isil//Hz
+objref div, conv, spk_train, spk, spk_trainb, isil
+public recvec, recvec1
+public locateSites, getLongestBranch, getAbsSecIndex, gvpre, gvpost
+public all, somatic, apical, axonal, basal, nSecSoma, nSecApical, nSecBasal, nSecAxonal, nSecAll, nSecAxonalOrig, SecSyn, distribute_channels
+objref SecSyn, this, gvpre, gvpost, recvec, recvec1
+
+strdef tstr
+
+
+public stellate, pyractive
+public basket, pyr, pyr2, OLM, ch_height, connect2target
+//public fid, sumdend
+public lambda_f, geom_nseg
+
+
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(0.5), $o1)
+  nc.threshold = -10
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+
+
+func lambda_f() { local i, x1, x2, d1, d2, lam
+        if (n3d() < 2) {
+                return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
+        }
+// above was too inaccurate with large variation in 3d diameter
+// so now we use all 3-d points to get a better approximate lambda
+        x1 = arc3d(0)
+        d1 = diam3d(0)
+        lam = 0
+        for i=1, n3d()-1 {
+                x2 = arc3d(i)
+                d2 = diam3d(i)
+                lam += (x2 - x1)/sqrt(d1 + d2)
+                x1 = x2   d1 = d2
+        }
+        //  length of the section in units of lambda
+        lam *= sqrt(2) * 1e-5*sqrt(4*PI*$1*Ra*cm)
+
+        return L/lam
+}
+
+proc geom_nseg() {
+  //soma area(.5) // make sure diam reflects 3d points
+  forsec all { nseg = int((L/(0.1*lambda_f(100))+.9)/2)*2 + 1  }
+}
+
+proc position() { local i, x, y, z
+//For plotting the network volume the network should be inflated by scale factor 100. As this shows anatomically approximate positions.
+//For simulating a network. scale factors should be reduced. to 10 As it is workable and computationally efficient to contract space.
+//Since less voxels will be compared for distance in algorithm find_distances.
+
+    x = 10*$1  y = 10*$2  z = 10*$3 //Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+    forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+      pt3dchange(i, x+x3d(i),y+y3d(i), z+z3d(i), diam3d(i))
+    }//dend 
+}
+
+//A dumb method delete it from public and here entirely.
+
+proc ch_height() { local i, x, y, z
+//For plotting the network volume the network should be inflated by scale factor 100. As this shows anatomically approximate positions.
+//For simulating a network. scale factors should be reduced. to 10 As it is workable and computationally efficient to contract space.
+//Since less voxels will be compared for distance in algorithm find_distances.
+
+  z = 100*$1  //y = 10*$2  z = 10*$3 //Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+ forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+    pt3dchange(i, x3d(i),y3d(i), z3d(i), diam3d(i))
+  }//dend
+ 
+}
+
+//The idea behind compress tree is to unfold all of the dendrites and axons so they all form one vertical line.
+//First just make the radius constant for the whole tree then straighten out the branches.
+proc compress_tree() { local dd,i,nd 
+ forall { 
+  for i = 0,n3d()-1 {
+     dd = diam3d(i)
+          pt3dchange(i, $1)
+          print "Note diam changed for: ",secname()," 3Dpoint: ",i," former: ",dd    
+   } 
+ }
+ forall { area(0.5) }
+ define_shape()
+ print "Done!\tDiam was changed for: ",nd," points"
+
+ forall {if (L>10) {nseg=int(L/10)}}
+}
+
+
+/* More appropriately moved out of the template.
+func fid() {local rmax, sx1, sy1, sz1, sx0, sy0, sz0, sumsom, sumap, sumdend, sumax localobj syn_
+//This is a redundant method for pruning internal distances. It should be made public and moved to morph2
+//, gabablist, ampalist//, prng//, cnt_r  // now expects xyc coords as arguments
+   rmax=0 
+ strdef furtherest_sec
+ 
+ sumsom=0
+ sumap=0
+ sumdend=0
+ sumax=0
+      forsec $o1.all{
+
+      if(issection($s2)){ break }
+      
+       //print $s2, secname()     
+        if(issection(".*soma.*")){ 
+           for i=0,n3d()-1{        
+              sumsom+=arc3d(i) //3d lists are only per section. Therefore to get the entire arc length it is necessary to sum across sections.
+           }
+          }
+         
+         if(issection(".*apic.*")){ 
+           for i=0,n3d()-1{        
+              sumap+=arc3d(i) //3d lists are only per section. Therefore to get the entire arc length it is necessary to sum across sections.
+           }
+          }
+         
+         if(issection(".*dend.*")){ 
+           for i=0,n3d()-1{        
+              sumdend+=arc3d(i) //3d lists are only per section. Therefore to get the entire arc length it is necessary to sum across sections.
+           }
+          }
+         
+         if(issection(".*axon.*")){ 
+          for i=0,n3d()-1{        
+              sumax+=arc3d(i) //3d lists are only per section. Therefore to get the entire arc length it is necessary to sum across sections.
+             }
+          }
+          
+   
+     } 
+      print $s2, secname()
+      print sumsom, "sum soma"
+      print sumap, "suma apic"
+      print sumdend, "sum dend"
+      print sumax, "sum axon"
+      return sumdend
+      
+}
+*/
+/*fid(Cell[0],"Cell[0].dend[10]")
+fid(Cell[0],"Cell[0].dend[15]")
+fid(Cell[0],"Cell[0].axon[42]")
+*/
+
+
+proc prune_internal_distances() {local rmax, sx1, sy1, sz1, sx0, sy0, sz0 localobj syn_
+//This is a redundant method for pruning internal distances. It should be made public and moved to morph2
+//, gabablist, ampalist//, prng//, cnt_r  // now expects xyc coords as arguments
+   rmax=0 
+   strdef furtherest_sec
+   forsec $o1.all{
+
+      if (ismembrane("xtra")) { //its something about xtra that only has segment indexs 
+         for (x,0) {
+         sum+=n3d()
+
+          r = (sqrt((x_xtra(x) - $o1.soma[0].x_xtra)^2 + (y_xtra(x) - $o1.soma[0].y_xtra)^2 + (z_xtra(x) - $o1.soma[0].z_xtra)^2))
+          if(r>rmax){
+           rmax=r
+           furtherest_sec=secname()
+          }
+          
+
+      }
+      print furtherest_sec
+    }
+    delete_section(furtherest_sec)
+  }
+} 
+//prune_internal_distances(cells.o(1))
+
+
+proc distribute_channels()	{local dist,val,base,maxLength
+	base = $8
+	soma distance()
+	maxLength = getLongestBranch($s1)
+         
+	forsec $s1		{
+		if(0==strcmp($s2,"Ra")){
+			Ra = $8
+		} else {
+			for(x) {
+			if((x>0)&&(x<1)){
+				if ($3==3) {
+					dist = distance(x)
+				} else {
+					dist = distance(x)/maxLength
+				}
+				val = calculate_distribution($3,dist,$4,$5,$6,$7,$8)
+				sprint(tstr,"%s(%-5.10f) = %-5.10f",$s2,x,val)
+				execute(tstr)
+				//print tstr
+			}
+		}
+	}
+}
+}
+// $1 is the distribution type:
+//     0 linear, 1 sigmoid, 2 exponential
+//     3 step for absolute distance (in microns)
+func calculate_distribution()	{local value
+	if ($1==0)	{value = $3 + $2*$4}
+	if ($1==1) {value = $3 + ($4/(1+exp(($2-$5)/$6)))}
+  	if ($1==2) {value = $3 + $6*exp($4*($2-$5))}
+	if ($1==3) {
+		if (($2 > $5) && ($2 < $6)) {
+			value = $3
+		} else {
+			value = $4
+		}
+	}
+	value = value*$7
+	return value
+}
+
+// $s1 section
+func getLongestBranch(){local maxL,d localobj distallist,sref
+    sprint(tstr,"%s distance()",$s1)
+    execute(tstr,this)    
+    
+  	if(0==strcmp($s1,"axon")){
+      sprint(tstr,"%s[0] distance(1)",$s1)
+      execute(tstr,this)    
+  	}
+
+		maxL = 0
+		d = 0
+		distallist = new SectionList()
+		forsec $s1 {
+			sref = new SectionRef()
+			if (sref.nchild==0) distallist.append()
+		}
+		forsec distallist{
+			d = distance(1)
+			if(maxL<d) maxL = d
+		}
+		// for the soma case
+		if (maxL == 0) {
+      $s1 {
+        maxL = L
+      }
+    }
+		return maxL
+	}
+
+// $s1 section
+// $2 distance x in micrometers
+// return list of [1,2] vectors  - of the appropriate section and the location in each vector
+obfunc locateSites() {local maxL,site,d0,d1,siteX,i localobj vv,ll
+	ll = new List()
+
+  sprint(tstr,"%s distance()",$s1)
+  execute(tstr,this)    
+    
+	if(0==strcmp($s1,"axon")){
+    sprint(tstr,"%s[0] distance(1)",$s1)
+    execute(tstr,this)    
+	}
+
+	maxL = getLongestBranch($s1)
+	site = $2
+	i = 0
+	forsec $s1 {
+    if (distance(0) < distance(1)) {
+  		d0 = distance(0)
+  		d1 = distance(1)
+  	} else {
+  		d1 = distance(0)
+  		d0 = distance(1)
+  	}
+
+    if (site <= d1 && site >= d0) {
+      siteX = (site-d0)/(d1-d0)
+      secNum = i
+      vv = new Vector()
+      ll.append(vv.append(secNum,siteX))
+		}
+		i = i+1
+	}
+  return ll
+}
+/*
+func getAbsSecIndex(){ local nAbsInd, index  localobj str,strObj
+    strObj  =  new StringFunctions()
+    str     =  new String()
+    nAbsInd = 0
+    index   = 0
+    if(strObj.substr($s1, "soma") > 0) {
+        strObj.tail($s1, "soma", str.s)
+        if(sscanf(str.s, "%*c%d", &index) < 0) {
+            index = 0
+        }
+        nAbsInd = index
+    }else if (strObj.substr($s1, "axon") >0) {
+        strObj.tail($s1, "axon", str.s)
+        if(sscanf(str.s, "%*c%d", &index) < 0) {
+            index = 0
+        }
+        nAbsInd = nSecSoma + index
+    }else if (strObj.substr($s1, "dend") >0) {
+        strObj.tail($s1, "dend", str.s)
+        if(sscanf(str.s, "%*c%d", &index) < 0) {
+            index = 0
+        }
+        nAbsInd = nSecSoma + nSecAxonalOrig + index
+    }else if (strObj.substr($s1, "apic") > 0) {
+        strObj.tail($s1, "apic", str.s)
+        if(sscanf(str.s, "%*c%d", &index) < 0) {
+            index = 0
+        }
+        nAbsInd = nSecSoma + nSecAxonalOrig + nSecBasal + index
+    }
+    return nAbsInd
+}
+*/
+//dendrites grow as weights saturate during wakefulness. 
+//dendrites shrink back during sleep
+proc prune_one(){ local cnt_a, cnt_d, i
+cnt_a=0
+cnt_d=0
+cnt_ax=0
+//Do this in iterations, not at all at once.
+//As this will alter the resistivity of the network as well.
+//What kind of filter is this cell/network?
+//use adjancency matrix to reconnect the somas.
+//forall issection("*.apic*.") { cnt_a+=1 }
+forall{ issection(".*apic.*") { cnt_a+=1 }}
+forall{ issection(".*dend.*") { cnt_d+=1 }}
+forall{ issection(".*axon.*") { cnt_ax+=1 }}
+
+//forall forsec basal { cnt_d+=1 }
+ i=0
+ //print cnt_d, cnt_a, cnt_ax, "cnt_d ,cnt_a"
+ if(cnt_a>2){//){
+ forall{
+   issection(".*apic.*") { 
+        i+=1
+     //   print secname()
+     //   print cnt_a, i, "cnt_a, i"
+
+        if(i==cnt_a){
+        //cnt_a-=1
+
+        delete_section()
+       }   
+     }
+   }
+ }
+ i=0
+ //print cnt_d, cnt_ax, "cnt_d cnt_a"
+ if(cnt_ax>10){//Deleting the last 10 segments can have unpredictable results because unknown number of parent nodes.
+ forall{
+   issection(".*axon.*") { 
+        i+=1
+       // print secname()
+  //      print cnt_ax, i, "cnt_ax, i"
+
+        if(i==cnt_ax){
+        //cnt_a-=1
+
+        delete_section()
+       }   
+     }
+   }
+ }
+ i=0
+ if(cnt_d>2){//1){
+   forall{
+      issection(".*dend.*") { 
+        i+=1
+       // print secname()
+       // print cnt_d, i, "cnt_d, i"
+        if(i==cnt_d){
+
+        //cnt_d-=1
+
+        delete_section()
+       }
+     } 
+    }
+  }
+//  print cnt_d, cnt_a
+}
+
+proc clear_cell(){ local cnt_a, cnt_d, cnt_ax, i
+ //for cells.o($1).all{
+ forall{
+   for(x,0){
+     for j=0,n3d()-1{
+          secname()
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }
+    }
+}
+ 
+ 
+proc msd(){ local cnt_a, cnt_d, cnt_ax, i
+//make cell dead. To be called from a cell object.
+//also used for clearing a cell.
+
+
+cnt_a=0
+cnt_d=0
+cnt_ax=0
+//Do this in iterations, not at all at once.
+//As this will alter the resistivity of the network as well.
+//What kind of filter is this cell/network?
+//use adjancency matrix to reconnect the somas.
+//forall issection("*.apic*.") { cnt_a+=1 }
+forall{ issection(".*apic.*") { cnt_a+=1 }}
+forall{ issection(".*dend.*") { cnt_d+=1 }}
+forall{ issection(".*axon.*") { cnt_ax+=1 }}
+
+
+ i=0
+
+ if(cnt_a>2){
+ forall{
+   issection(".*apic.*") { 
+        i+=1
+        if(i==cnt_a){
+         if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0 //set the weights to zero to render synapse useless.
+          
+     
+         }
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }   
+     }
+   }
+ }
+ i=0
+
+ if(cnt_ax>2){//Deleting the last 10 segments can have unpredictable results because unknown number of parent nodes.
+ forall{
+   issection(".*axon.*") { 
+        i+=1
+        if(i==cnt_ax){
+          if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0//set the weights to zero to render synapse useless.
+           
+     
+         }
+
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       
+       }   
+     }
+   }
+ }
+ i=0
+ if(cnt_d>2){
+   forall{
+      issection(".*dend.*") { 
+        i+=1
+        if(i==cnt_d){
+          if(ismembrane("AMPA")||ismembrane("GABAa")||ismembrane("NMDA")){
+            //psection()
+            weight=0//set the weights to zero to render synapse useless.
+    
+     
+         }
+         for j=0,n3d()-1{
+          pt3dchange(j, 0) //Just change diam to 0.
+         }
+       }
+     } 
+    }
+  }
+}
+
+
+
+proc prune_tree(){
+  for i=0,$1{
+    prune_one()
+  }
+} 
+ 
+ 
+
+
+
+
+proc unbranch_tree() { local dd,i,nd localobj strobj
+i=0
+strobj = new StringFunctions()
+ print "Checking tree"
+ print "Note: diam values less than 0.3um are set to 0.3um!!"
+ nd = 0
+ forall { 
+number=n3d()
+
+while(i<n3d()){ //why would I think these lists are created in the sequence distal most dendrite to proximal most dendrite. I want to prune distal to proximal.
+     print "i=", i, "n3d()=", n3d(), number
+     print secname()
+     if (issection(".*dend.*")){
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     }
+     ifr (issection(".*axon.*")){
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     }
+     if (issection(".*apic.*")){ 
+       secname()
+       pt3dchange(i, 0)
+       print "removed"
+     } 
+     i+=1
+  }
+ }
+}
+
+
+proc check_tree() { local dd,i,nd
+ print "Checking tree"
+ print "Note: diam values less than 0.3um are set to 0.3um!!"
+ nd = 0
+ forall { 
+  for i = 1,n3d()-1 {
+     if (diam3d(i-1) > diam3d(i) + 1 ) { 
+         print "Jump diam + >  1um in: ",secname()," 3Dpoint: ",i,diam3d(i),diam3d(i-1)  
+     }
+     if (diam3d(i) > diam3d(i-1) + 1 ) { 
+         print "Jump diam - >  1um in: ",secname()," 3Dpoint: ",i,diam3d(i-1),diam3d(i)  
+     }
+  }
+ }
+ forall { 
+  for i = 0,n3d()-1 {
+     dd = diam3d(i)
+     if ( dd < 0.6 ) { 
+          pt3dchange(i, 0.3)
+     nd = nd+1        
+          print "Note diam changed to 0.3 for: ",secname()," 3Dpoint: ",i," former: ",dd
+      }
+     
+   } 
+ }
+ forall { area(0.5) }
+ define_shape()
+ print "Done!\tDiam was changed for: ",nd," points"
+
+ forall {if (L>10) {nseg=int(L/10)}}
+ 
+}
+
+/*
+###############################################################################
+#
+# Basket Cell -- Bwb
+#
+###############################################################################
+
+class Bwb(Cell):
+	"Basket cell"
+	*/
+	
+	proc basket(){
+	    forall{
+  		insert pas
+		e_pas = -65     //# mV
+		g_pas = 0.1e-3  //# S/cm2 
+		
+		insert Nafbwb
+		insert Kdrbwb
+	    }
+	}	
+	
+	
+	proc OLM(){
+	    forall{
+		insert  pas 
+		e_pas = -65     //# mV
+		g_pas = 0.1e-3  //# S/cm2 
+		
+		insert Nafbwb 
+		insert Kdrbwb 
+		
+		insert Iholmw
+		insert Caolmw
+		insert ICaolmw
+		insert KCaolmw
+	    }
+	}
+/*
+	def set_synapses(self):
+		somaGABAf 	= Synapse(sect=soma, loc=0.5, tau1=0.07, tau2=9.1, e=-80)
+		somaAMPAf 	= Synapse(    sect=soma, loc=0.5, tau1=0.05, tau2=5.3, e=0)
+		somaGABAss	= Synapse(    sect=soma, loc=0.5, tau1=20,	  tau2=40, e=-80)#only for septal input
+		somaNMDA 	= SynapseNMDA(sect=soma, loc=0.5, tau1=0.05, tau2=5.3, tau1NMDA=15, tau2NMDA=150, r=1, e=0)
+		
+###############################################################################
+#
+# Pyramidal Cell -- KopAdr
+#
+###############################################################################
+*//*
+
+class PyrAdr(Cell):
+"Pyramidal cell"*/
+proc pyr(){
+  forall{
+      insert  pas 
+      g_pas = 0.0000357
+      insert  nacurrent 
+      insert  kacurrent 
+      insert  kdrcurrent 
+      insert  hcurrent 
+      e_pas = -70//      mV
+      cm = 1
+      Ra = 150
+  }
+  forsec apical{
+      ki_nacurrent = 0.5
+      g_kacurrent  = 0.072
+      v50_hcurrent = -82
+      g_hcurrent   = 0.0002
+      
+      ki_nacurrent = 0.5
+      g_kacurrent  = 0
+      gd_kacurrent = 0.120
+      v50_hcurrent = -90
+      g_hcurrent   = 0.0004
+      
+      cm           = 2
+      
+      g_pas        = 0.0000714
+      ki_nacurrent = 0.5
+      g_kacurrent  = 0
+      gd_kacurrent = 0.200
+      v50_hcurrent = -90
+      g_hcurrent   = 0.0007
+  }
+  forsec basal{
+      //nacurrent.ki  = 1
+  }
+}
+
+
+proc pyr2(){
+forall {
+	  insert pas
+	  cm = 1
+	  Ra = 100
+	  e_pas = -90
+	}
+
+  forsec somatic {
+      insert Ca_LVAst 
+      insert Ca_HVA 
+      insert SKv3_1 
+      insert SK_E2 
+      insert K_Tst 
+      insert K_Pst 
+      insert Nap_Et2 
+      insert NaTa_t
+      insert CaDynamics_E2
+      insert Ih
+      ek = -85
+      ena = 50
+      gIhbar_Ih = 0.0002
+      g_pas = 0.0000344 
+      decay_CaDynamics_E2 = 486.0 
+      gamma_CaDynamics_E2 = 0.000549 
+      gCa_LVAstbar_Ca_LVAst = 0.00432 
+      gCa_HVAbar_Ca_HVA = 0.000567 
+      gSKv3_1bar_SKv3_1 = 0.766 
+      gSK_E2bar_SK_E2 = 0.0556 
+      gK_Tstbar_K_Tst = 0.0326 
+      gK_Pstbar_K_Pst = 0.000547 
+      gNap_Et2bar_Nap_Et2 = 0.00496 
+      gNaTa_tbar_NaTa_t = 1.71 
+  }
+
+	forsec apical {
+      insert Ih
+
+		cm = 2
+		insert Ih
+  	insert SK_E2 
+  	insert Ca_LVAst 
+  	insert Ca_HVA 
+  	insert SKv3_1 
+  	insert NaTa_t 
+  	insert Im 
+  	insert CaDynamics_E2
+		ek = -85
+		ena = 50
+    decay_CaDynamics_E2 = 88.9 
+    gamma_CaDynamics_E2 = 0.0005 
+    gSK_E2bar_SK_E2 = 0.00186 
+  	gSKv3_1bar_SKv3_1 = 0.000298 
+  	gNaTa_tbar_NaTa_t = 0.0211 
+  	gImbar_Im = 0.00006 
+  	g_pas = 0.0000447 
+	}
+	
+	//distribute_channels("apic","gIhbar_Ih",2,-0.8696,3.6161,0.0,2.0870,0.00020000000) 
+	//distribute_channels("apic","gCa_LVAstbar_Ca_LVAst",3,1.000000,0.010000,685.000000,885.000000,0.0198000000) 
+	//distribute_channels("apic","gCa_HVAbar_Ca_HVA",3,1.000000,0.100000,685.000000,885.000000,0.0004370000) 
+	
+  forsec basal {
+		cm = 2
+		insert Ih
+		gIhbar_Ih = 0.0002
+  	g_pas = 0.0000535 
+	}
+
+  forsec axonal {
+  	g_pas = 0.000045 
+	}
+
+
+}
+
+proc dchan(){
+ ifsec "*.apic*" {
+
+    distribute_channels("apic","gIhbar_Ih",2,-0.8696,3.6161,0.0,2.0870,0.00020000000) 
+    distribute_channels("apic","gCa_LVAstbar_Ca_LVAst",3,1.000000,0.010000,685.000000,885.000000,0.0198000000) 
+    distribute_channels("apic","gCa_HVAbar_Ca_HVA",3,1.000000,0.100000,685.000000,885.000000,0.0004370000) 
+    }
+}
+// --------------------------------------------------------------
+// passive & active membrane 
+// --------------------------------------------------------------
+/*proc pyractive(){
+forall insert na
+forall insert kca
+  forsec all{
+    ra        = 150
+    global_ra = ra
+    rm        = 30000
+    c_m       = 0.75
+    cm_myelin = 0.04
+    g_pas_node = 0.02
+
+    v_init    = -70
+    //celsius   = 37
+
+    Ek = -90
+    Ena = 60
+
+
+    gna_dend = 20
+    gna_node = 30000
+    gna_soma = gna_dend
+
+    gkv_axon = 2000
+    gkv_soma = 200
+
+    gca = .3
+    gkm = .1
+    gkca = 3
+
+    gca_soma = gca
+    gkm_soma = gkm
+    gkca_soma = gkca
+     
+
+    // --------------------------------------------------------------
+    // Axon geometry
+    //
+    // Similar to Mainen et al (Neuron, 1995)
+    // --------------------------------------------------------------
+     //create_axon()
+      //if (!aspiny) add_spines(dendritic_only,0.5)
+      // passive
+      for axonal {
+        insert pas
+        Ra = ra 
+        cm = c_m 
+        g_pas = 1/rm
+        e_pas = v_init
+      }
+
+      // exceptions along the axon
+      forsec "myelin" cm = cm_myelin
+      forsec "node" g_pas = g_pas_node
+
+      // na+ channels
+      forall insert na
+      forsec apical{ gbar_na = gna_dend }
+      //forsec "myelin" gbar_na = gna_dend
+      //hill.gbar_na = gna_node
+      //iseg.gbar_na = gna_node
+      //forsec "node" gbar_na = gna_node
+
+      // kv delayed rectifier channels
+     // iseg { insert kv  gbar_kv = gkv_axon }
+     // hill { insert kv  gbar_kv = gkv_axon }
+     // soma { insert kv  gbar_kv = gkv_soma }
+
+      // dendritic channels
+      forsec basal {
+        insert km    gbar_km  = gkm
+        insert kca   gbar_kca = gkca
+        insert ca    gbar_ca = gca
+        insert cad
+      }
+
+      forsec somatic {
+        gbar_na = gna_soma
+        gbar_km = gkm_soma
+        gbar_kca = gkca_soma
+        gbar_ca = gca_soma
+      }
+
+     
+      forall if(ismembrane("k_ion")) ek = Ek
+      forall if(ismembrane("na_ion")) {
+        ena = Ena
+        // seems to be necessary for 3d cells to shift Na kinetics -5 mV
+        vshift_na = -5
+      }
+      forall if(ismembrane("ca_ion")) {
+        eca = 140
+        ion_style("ca_ion",0,1,0,0,0)
+        vshift_ca = 0
+      }
+    }
+  
+}
+
+
+proc stellate(){*/
+//forall insert na
+//forall insert kca
+/* --------------------------------------------------------------
+   Two-compartment reduced model for neocortical electrogenesis
+   DEMO
+  
+   Z. F. Mainen and T. J. Sejnowski (1996) Influence of dendritic
+   structure on firing pattern in model neocortical neurons. 
+   Nature 382: 363-366. 
+
+   author:
+   Zach Mainen
+   zach@salk.edu
+ 
+   -------------------------------------------------------------- 
+   zaza3@zaza3:~/Downloads/patdemo
+
+  forsec all{
+    forsec basal {
+        diam = 10/PI          
+        // note, L and Ra are set in "init()" procedure
+
+                         // uses the associated ".mod" files
+        insert na        // na.mod
+        insert km        // km.mod
+        insert kca       // kca.mod
+        insert ca        // ca.mod
+        insert cad       // cad.mod
+        insert pas     
+    }
+
+    forsec axonal {
+        diam = 10/PI
+        L = 10            // area of 100 um^2
+        // note Ra of axon is irrelevant to the 2-comp simulation
+
+        insert na         // na.mod
+        insert kv         // kv.mod
+    }
+
+
+
+    // --------------------------------------------------------------
+    // electrical geometry
+    // --------------------------------------------------------------
+
+
+    rho = 165            // dendritic to axo-somatic area ratio 
+                         // useful range approx (50 to 200)
+    kappa = 10           // coupling resistance (Mohm) 
+                         // useful range approx (0 to 10)
+
+
+    // --------------------------------------------------------------
+    // passive properties
+    // --------------------------------------------------------------
+
+    forsec basal{
+    v_init    = -70      // resting membrane potential (approximate) (mV)
+    forall cm = 0.75     // membrane capacity (uF-cm^-2
+    rm        = 30000    // membrane resistivity (ohm-cm^2)
+    g_pas = 1/rm    // only dendrite has leak conductance
+    e_pas = v_init  // leak reversal potential (mV)
+    }
+
+    // --------------------------------------------------------------
+    // active conductances
+    // --------------------------------------------------------------
+
+    forsec axonal{                     // Axo-somatic conductance densities (pS-um^-2)
+    gbar_na = 30000     // fast Na+ 
+    gbar_kv = 1500      // fast non-inactivating K+ 
+    }
+     
+    forsec basal{                     // Dendritic conductance densities (pS-um^-2)
+      gbar_na = 15         // fast Na+ 
+      gbar_ca = 0.3         // high voltage-activated Ca^2+ 
+      gbar_km = 0.1         // slow voltage-dependent non-inactivating K+
+      gbar_kca = 3         // slow Ca^2+-activated K+
+    }
+
+    forall ek = -90      // K+ current reversal potential (mV)
+    forall ena = 60      // Na+ current reversal potential (mV)
+
+    forsec basal{
+     eca = 140       // Ca2+ current reversal potential (mV)
+                         // using an ohmic current rather than GHK equation
+     ion_style("ca_ion",0,1,0,0,0) 
+     
+    }  
+
+     forsec basal {
+       // L  = rho*axon.L          // dend area is axon area multiplied by rho
+        Ra = Ra*kappa/ri(.5)     // axial resistivity is adjusted to achieve
+                                 // desired coupling resistance
+      }
+  }
+}
+*/
+
+
+proc init() {
+    all = new SectionList()
+    somatic = new SectionList()
+    axonal = new SectionList()
+    basal = new SectionList()
+    apical = new SectionList()
+    spk_trig_ls = new SectionList()
+    spk_rx_ls = new SectionList()
+    
+    synlist = new List()
+    gabalist = new List()
+    ampalist = new List()
+    nmdalist = new List()
+    noiselist=new List()
+    geom_nseg()
+    //pyr2()
+    
+    polarity=0
+    type=-1
+    num_type=0
+    inimp0=0
+    inimp20=0
+    inimp100=0
+    gid1=0
+    cell_lai=0
+    div= new Vector() //initialise these vectors to be zero, but same size as number of cells
+    conv=new Vector() 
+    gvpre=new Vector()
+    gvpost=new Vector()
+    spk=new Vector()
+    spk_train=new Vector()
+    isil = new Vector()
+    spk_trainb=new Vector()
+    recvec=new Vector()
+    recvec1=new Vector()
+    
+}
+
+
+endtemplate Cell
+
+// $s1 swc morphology file name
+// on exit the return object is a Cell instance with
+// the morpology specified by the $s1 file
+obfunc mkcell() { localobj import, morph, cell, nil
+    cell = new Cell()
+    morph = new Import3d_SWC_read()
+    morph.input($s1)
+    import = new Import3d_GUI(morph, 0)
+    execute("forall delete_section()", cell)
+    import.instantiate(cell)
+    if(object_id(cell)!=0){
+     cnts_=0
+     cntd_=0
+     cnta_=0 
+     
+     //A forall here, would be for the whole network.
+     //forsec cell.all is only for a cell.
+     forsec cell.all{//A cell with no soma or dendrite will prove to be useless. 
+            //These morphologies will be deleted from the collection.
+       for(x,0){
+         if(issection(".*soma.*")){
+           cnts_+=1
+           cell.spk_trig_ls.append(secname())   
+         }
+         if(issection(".*dend.*")){
+           cntd_+=1
+           cell.spk_rx_ls.append(secname()) 
+         }
+         if(issection(".*apic.*")){
+           cell.spk_rx_ls.append(secname())
+         }
+          if(issection(".*axon.*")){
+           cnta_+=1
+           cell.spk_trig_ls.append(secname())   
+           
+         }
+       }
+      }
+     
+     if((cnts_==0)||(cntd_==0)){ //delete cells that have zero soma and dendrite segments.
+        //print "efficatious?"
+        //quit()
+        strdef delete_morph_f
+        sprint(delete_morph_f,"%s%s","rm ",$s1)
+        system(delete_morph_f)
+
+        print "rejected, no soma, or no dendrite"
+        //will put call to quit() here later. To check if this executes.
+      }else if((cnts_!=0)&&(cntd_!=0)){
+        cell=cell
+      }else if(cnta_==0){
+        cell=nil
+      }
+ 
+     
+  
+   }else{
+     cell=nil
+   }
+   // cell.prune_tree(50)
+   return cell
+   cell.geom_nseg()
+     
+      
+}
+
+begintemplate Cellbasic
+public compress_tree, prune_tree, prune_one, dchan
+public soma, axon, dend, apic         
+create soma[1], axon[1], dend[1], apic[1]
+public all, somatic, axonal, basal, apical, position, synlist, compress_tree, unbranch_tree, ampalist, gabalist, type, name, basketHIPP, ca1pyrHIPP, nametype, num_type, noiselist, nmdalist, population
+objref all, somatic, axonal, basal, apical, synlist, ampalist, gabalist, noiselist, nmdalist
+strdef name, nametype, population
+public div, conv, div1, conv1
+objref div, conv
+public chlen, chra
+public stellate, pyractive
+public basket, pyr, OLM, ch_height
+
+create soma[1]
+
+soma {
+    nseg = 10
+    diam = 18.8
+    L = 100
+    Ra = 123.0
+}
+
+public lambda_f, geom_nseg
+func lambda_f() { local i, x1, x2, d1, d2, lam
+        if (n3d() < 2) {
+                return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
+        }
+// above was too inaccurate with large variation in 3d diameter
+// so now we use all 3-d points to get a better approximate lambda
+        x1 = arc3d(0)
+        d1 = diam3d(0)
+        lam = 0
+        for i=1, n3d()-1 {
+                x2 = arc3d(i)
+                d2 = diam3d(i)
+                lam += (x2 - x1)/sqrt(d1 + d2)
+                x1 = x2   d1 = d2
+        }
+        //  length of the section in units of lambda
+        lam *= sqrt(2) * 1e-5*sqrt(4*PI*$1*Ra*cm)
+
+        return L/lam
+}
+
+proc geom_nseg() {
+  //soma area(.5) // make sure diam reflects 3d points
+  forsec all { nseg = int((L/(0.1*lambda_f(100))+.9)/2)*2 + 1  }
+}
+
+proc position() { local i, x, y, z
+//For plotting the network volume the network should be inflated by scale factor 100. As this shows anatomically approximate positions.
+//For simulating a network. scale factors should be reduced. to 10 As it is workable and computationally efficient to contract space.
+//Since less voxels will be compared for distance in algorithm find_distances.
+
+    x = 100*$1  y = 100*$2  z = 100*$3 //Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+    forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+      pt3dchange(i, x+x3d(i),y+y3d(i), z+z3d(i), diam3d(i))
+    }//dend 
+}
+
+
+func cellInfol(){local totalVolume localobj return_arr 
+total_volume=0
+totalVolume=0
+ forall {
+    
+    	   total_volume=total_volume+(L*PI*diam^2) 
+
+        totalDiam = totalDiam + diam
+        totalNseg = totalNseg + nseg
+        totalRa = totalRa + Ra
+        totalCm = totalCm + cm
+        
+        totalL = totalL + L
+        numSections = numSections + 1
+        
+        }
+        totalVolume = totalL*PI*totalDiam^2 
+
+  	print total_volume," check= ",totalVolume
+  	return totalVolume
+ }
+
+
+proc contract_cell() { local i, x, y, z
+/*As in shrink the cell down while retaining the same number of sections and segments. This will be a less problematic method of pruning.
+
+
+This method might be callable after wiring without causing a segmentation fault.
+*/
+factor=$1
+
+//Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+    forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+      pt3dchange(i, (1/factor)*x3d(i),(1/factor)*y3d(i), (1/factor)*z3d(i), diam3d(i))
+    }//dend 
+}
+
+proc basket(){
+  forsec somatic{
+  	insert pas
+		 e_pas = -65     //# mV
+		 g_pas = 0.1e-3  //# S/cm2 
+	   
+		 insert Nafbwb
+		 insert Kdrbwb
+ }
+}	
+
+/*   
+	def set_synapses(self):
+		somaAMPAf 	= Synapse(sect=soma, loc=0.5, tau1=0.05, tau2=5.3, e=0)
+		somaGABAf 	= Synapse(sect=soma, loc=0.5, tau1=0.07, tau2=9.1, e=-80)
+		somaGABAss	= Synapse(sect=soma, loc=0.5, tau1=20,   tau2=40, e=-80)#only for septal input
+		somaNMDA 	= SynapseNMDA(sect=soma, loc=0.5, tau1=0.05, tau2=5.3, tau1NMDA=15, tau2NMDA=150, r=1, e=0)
+		
+###############################################################################
+#
+# OLM Cell -- Ow
+#
+###############################################################################
+class Ow(Cell):
+	"OLM cell"
+   
+	def set_morphology(self):
+		total_area = 10000 # um2
+		soma.nseg  = 1
+		soma.cm    = 1      # uF/cm2
+		diam = sqrt(total_area) # um
+		L    = diam/pi  # um
+
+		h.pt3dclear(sec=soma)
+		h.pt3dadd(x, y, z,   diam, sec=soma)
+		h.pt3dadd(x, y, z+L, diam, sec=soma)
+*/
+	//def set_conductances(self):
+proc OLM(){
+		forsec somatic{
+		insert  pas 
+		e_pas = -65     //# mV
+		g_pas = 0.1e-3  //# S/cm2 
+
+		insert Nafbwb 
+		insert Kdrbwb 
+
+		insert Iholmw
+		insert Caolmw
+		insert ICaolmw
+		insert KCaolmw
+		}
+}
+/*
+	def set_synapses(self):
+		somaGABAf 	= Synapse(sect=soma, loc=0.5, tau1=0.07, tau2=9.1, e=-80)
+		somaAMPAf 	= Synapse(    sect=soma, loc=0.5, tau1=0.05, tau2=5.3, e=0)
+		somaGABAss	= Synapse(    sect=soma, loc=0.5, tau1=20,	  tau2=40, e=-80)#only for septal input
+		somaNMDA 	= SynapseNMDA(sect=soma, loc=0.5, tau1=0.05, tau2=5.3, tau1NMDA=15, tau2NMDA=150, r=1, e=0)
+		
+###############################################################################
+#
+# Pyramidal Cell -- KopAdr
+#
+###############################################################################
+class PyrAdr(Cell):
+	"Pyramidal cell"*/
+proc pyr(){
+  forall{
+			   insert  pas 
+			   g_pas = 0.0000357
+			   insert  nacurrent 
+			   insert  kacurrent 
+			   insert  kdrcurrent 
+			   insert  hcurrent 
+		    e_pas = -70//      mV
+			   cm = 1
+			   Ra = 150
+  }
+  forsec apical{
+		   ki_nacurrent = 0.5
+		   g_kacurrent  = 0.072
+		   v50_hcurrent = -82
+		   g_hcurrent   = 0.0002
+		
+		   ki_nacurrent = 0.5
+		   g_kacurrent  = 0
+		   gd_kacurrent = 0.120
+		   v50_hcurrent = -90
+		   g_hcurrent   = 0.0004
+		
+		   cm           = 2
+		   
+		   g_pas        = 0.0000714
+		   ki_nacurrent = 0.5
+		   g_kacurrent  = 0
+		   gd_kacurrent = 0.200		
+		   v50_hcurrent = -90
+		   g_hcurrent   = 0.0007
+  }
+  forsec basal{		
+		  //nacurrent.ki  = 1
+  }
+}
+
+proc chlen(){
+  access soma
+  soma L=$1
+}
+proc chra(){
+  access soma
+  soma Ra=$1
+
+}
+
+proc init() {
+    all = new SectionList()
+    somatic = new SectionList()
+    axonal = new SectionList()
+    basal = new SectionList()
+    apical = new SectionList()
+    synlist = new List()
+    gabalist = new List()
+    ampalist = new List()
+    //nmdalist = new List()
+    //noiselist = new List()
+    type=-1
+    num_type=0
+    div= new Vector()
+    conv=new Vector()
+    //spk=new Vector()
+    //spk_train=new Vector()
+    access soma
+    if(numarg()==1){
+      soma nseg=$1
+    }
+    if(numarg()>1){
+      soma L = $2
+    }
+    if(numarg()>2){
+      soma Ra = $3
+    }   
+    geom_nseg()
+    
+}
+
+endtemplate Cellbasic
+
+
+
+
+

@@ -4,7 +4,6 @@ The parallel wiring related functions are written by Russell Jarvis rjjarvis@asu
 '''
 
 
-#from allensdk.model.biophys_sim.neuron.hoc_utils import HocUtils
 import logging
 import glob
 from mpi4py import MPI
@@ -90,49 +89,51 @@ class Utils():
         self.debugdata=[]
         self.names_list=np.zeros((self.NCELL, self.NCELL))
         self.global_names_list=np.zeros((self.NCELL, self.NCELL))
-        #h.xopen("cell.hoc")
-        #h.xopen("stdgui.hoc")
+      
         h('load_file("nrngui.hoc")')
         h('load_file("import3d.hoc")')
         h('load_file("morph4.hoc")')
     
     def prep_list(self):                    
         '''
-        find which list has the shortest length.
-        and construct a new list with 1 in 3 inhibitory neurons and 2 out of 3 excitatory neurons. 
+        Construct a new list with 1 in 3 inhibitory neurons and 2 out of 3 excitatory neurons. 
         It would be preferable to make an exhaustive list of all neurons
         however this is not practical for debugging small models, composed
         of a balance between excitation and inhibition.
         '''
-        allrows = pickle.load(open('allrows.p', 'rb'))
-        allrows.remove(allrows[0])#The first list element is the column titles. 
-        allrows = [i for i in allrows if int(len(i))>9 ]
-        markram = [i for i in allrows if "Markram" in i]        
+        cil = pickle.load(open('cellinfolist.p', 'rb'))
+        cil.remove(cil[0])#The first list element is the column titles.
+        #inhibitory = map(lambda cil : cil if i[5]!="interneuron", i)
+        cil = [i for i in cil if int(len(i))>9 ]
+        assert len(cil)!=0
+        markram = [i for i in cil if "Markram" in i]
+        aspiny=[i for i in cil if not "interneuron" in i if not "pyramid" in i]
+        #stellate=[i for i in aspiny if "stellate" in i]
+        #basket=[i for i in cil if "basket" in i]
         return markram
+    
+    def _move_cells(self):
+        '''
+        Not something that would typically be executed.
+        '''
+        for m in markram:
+            execute_string='mv main/'+m[len(m)-2]+' swcfolder'
+            print execute_string
+            os.system(execute_string)        
+        
+    	return markram
     
     def both_trans(self,markram):
         '''
+        A private method. Prepend _ to all private methods in this class, to be conventional.
         Make sure that the network is composed of 2/3 excitatory neurons 1/3 inhibitory neurons.
         '''
+        assert len(markram)!=0
         bothtrans=[]                                                                      
-        bothtrans=[i for j,i in enumerate(markram) if "interneuron" in i if j<(self.NCELL/3)]
-        bothtrans.extend([i for j,i in enumerate(markram) if not "interneuron" in i if j>=(self.NCELL/3)])        
+        bothtrans=[i for j,i in enumerate(markram) if "interneuron" in i ]
+        bothtrans=[i for j,i in enumerate(markram) if not "interneuron" in i if (j>=2*(len(bothtrans)/3.0))and(j<self.NCELL)]
         return bothtrans
- 
-    def my_decorator(self,some_function):
-        def wrapper(self):
-            h=self.h    
-            NCELL=self.NCELL
-            SIZE=self.SIZE
-            RANK=self.RANK
-            pc=h.ParallelContext()            
-            self.some_function()
-        return wrapper
-    
-    #@my_decorator
-    #makecells()#I want to pass the function makecells as a function to the decorator.
-    #So, @my_decorator is just an easier way of saying just_some_function = my_decorator(just_some_function). 
-    #It's how you apply a decorator to a function
+(??)
             
     def make_cells(self,polarity):
         '''        Distribute cells across the hosts in a
@@ -152,7 +153,6 @@ class Utils():
         
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
-        #fit_ids = self.description.data['fit_ids'][0] #excitatory
         for (j,i) in itergids:
             self.has_cells=1#RANK specific attribute simplifies later code.
             cell = h.mkcell(j)
@@ -194,8 +194,6 @@ class Utils():
         h('objref nc, cells')
         swcdict={}
         NFILE = 3175
-        #fit_ids = self.description.data['fit_ids'][0]        
-        #self.cells_data = self.description.data['biophys'][0]['cells']
         bothtrans=self.both_trans(self.prep_list())   
         self.names_list=[0 for x in xrange(0,len(bothtrans))]
         os.chdir(os.getcwd() + '/swclist') 
@@ -895,5 +893,20 @@ class Utils():
         if 'dg_basket' in d:
             x.set_neuron(nlex_id='nlx_cell_100201')
             pass
+        
+    def my_decorator(self,some_function):
+        def wrapper(self):
+            h=self.h    
+            NCELL=self.NCELL
+            SIZE=self.COMM.size
+            RANK=self.COMM.rank
+            pc=h.ParallelContext()            
+            self.some_function()
+        return wrapper
+    
+    #@my_decorator
+    #makecells()#I want to pass the function makecells as a function to the decorator.
+    #So, @my_decorator is just an easier way of saying just_some_function = my_decorator(just_some_function). 
+    #It's how you apply a decorator to a function
        
             

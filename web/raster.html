@@ -1,0 +1,94 @@
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+ <script src="//d3js.org/d3.v3.min.js"></script>
+
+</head>
+
+<body>
+
+
+
+  <div id="myDiv" style="width: 1000px; height: 700px;"></div>
+  <script>
+d3.json('js/global_whole_network.json', function(error, data){
+  if (error) throw error;
+    
+
+  /*     
+  Written by Dulini Mendis
+  https://github.com/DuliniMendis/RodentTest/blob/gh-pages/raster.html
+  with unnecessary comments by Russell Jarvis
+  */
+
+
+var neurons = Object.keys(data[7]).map(function(key){ return data[7][key] }); //object with filenames and whether its excitatory or inhibitory
+
+//Get excitatory and inhibitory neurons indices separately
+var neuronType = neurons.map(function(a) {return a[1];});
+var neuronInds = neuronType.map(function(a,i){ if(a==0){ return i;} else return null; });
+var inNeuronInds = neuronInds.filter(function(a){return a!=null;});
+var neuronInds = neuronType.map(function(a,i){ if(a==1){ return i;} else return null; });
+var exNeuronInds = neuronInds.filter(function(a){return a!=null;});
+
+    console.log(inNeuronInds);
+    console.log(data[9]);
+
+var trace1 = {
+	x: data[8].filter(function(d,i){return exNeuronInds.indexOf(data[9][i])>=0;}),
+	y: data[9].filter(function(d,i){return exNeuronInds.indexOf(d)>=0;}),
+
+  mode: 'markers',
+  type: 'scatter',
+  name: 'Excitatory', 
+  marker: { 
+      color: "#25BA2A",
+      size: 12 }
+};
+    
+    var trace2 = {
+	x: data[8].filter(function(d,i){return inNeuronInds.indexOf(data[9][i])>=0;}),
+	y: data[9].filter(function(d,i){return inNeuronInds.indexOf(d)>=0;}),
+
+  mode: 'markers',
+  type: 'scatter',
+  name: 'Inhibitory',
+  marker: { 
+      size: 12,
+      color: '#3366ff'      
+          }
+
+};
+console.log(trace2.x)
+
+
+var data = [trace1, trace2 ];
+
+var layout = { 
+  xaxis: {
+    range: [ 0, Math.max(data[9])+5 ] 
+  },
+  yaxis: {
+    range: [0, 40],
+    autotick: false,
+    dtick: 2,
+    ticks: 'outside'
+  },
+  legend: {
+    y: 5,
+    yref: 'paper',
+    font: {
+      family: 'Arial, sans-serif',
+      size: 20,
+      color: 'grey',
+    }
+  },
+  title:'Data Labels on the Plot',
+     hovermode: 'closest',
+     
+};
+
+Plotly.newPlot('myDiv', data, layout);
+});
+  </script>
+</body>

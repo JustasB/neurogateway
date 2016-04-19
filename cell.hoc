@@ -1,0 +1,115 @@
+begintemplate cell
+
+public init
+public soma, dend, apic, axon
+public all, somatic, basal, apical, axonal, dendritic, somatic_axonal
+public gid1, polarity
+//public connect2target, pp, x, y, z, position, is_art
+
+//double gid
+
+public polarity, cell_lai
+public compress_tree, prune_tree, prune_one, msd, clear_cell, dchan
+public soma, axon, dend, apic, contract_cell, cellInfol         
+create soma[1], axon[1], dend[1], apic[1]
+public all, somatic, axonal, basal, apical, position, synlist, compress_tree, unbranch_tree, ampalist, gabalist, noiselist, type, name, basketHIPP, ca1pyrHIPP, nametype, num_type, spk_trig_ls, spk_rx_ls 
+public nmdalist, population, reponame, gid1
+objref all, somatic, axonal, basal, apical, synlist, noiselist, ampalist, gabalist, nmdalist, spk_trig_ls, spk_rx_ls, contract_cell
+strdef name, nametype, population, reponame
+public div, conv, div1, conv1, msd, inimp0, inimp20, inimp100, spk_train, spk, spk_trainb, isil//Hz
+objref div, conv, spk_train, spk, spk_trainb, isil
+public recvec, recvec1
+public locateSites, getLongestBranch, getAbsSecIndex, gvpre, gvpost
+public all, somatic, apical, axonal, basal, nSecSoma, nSecApical, nSecBasal, nSecAxonal, nSecAll, nSecAxonalOrig, SecSyn, distribute_channels
+objref SecSyn, this, gvpre, gvpost, recvec, recvec1
+
+objref all, somatic, basal, apical, axonal, dendritic, somatic_axonal
+objref this
+
+public lambda_f, geom_nseg, connect2target
+
+
+proc init() {localobj nl, import
+        gid1=0
+        polarity=0
+	all = new SectionList()
+	somatic = new SectionList()
+	basal = new SectionList()
+	apical = new SectionList()
+	axonal = new SectionList()
+	dendritic = new SectionList()
+	somatic_axonal = new SectionList()
+	forall delete_section()
+    }
+    
+    
+
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(0.5), $o1)
+  nc.threshold = -10
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+
+
+func lambda_f() { local i, x1, x2, d1, d2, lam
+        if (n3d() < 2) {
+                return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
+        }
+// above was too inaccurate with large variation in 3d diameter
+// so now we use all 3-d points to get a better approximate lambda
+        x1 = arc3d(0)
+        d1 = diam3d(0)
+        lam = 0
+        for i=1, n3d()-1 {
+                x2 = arc3d(i)
+                d2 = diam3d(i)
+                lam += (x2 - x1)/sqrt(d1 + d2)
+                x1 = x2   d1 = d2
+        }
+        //  length of the section in units of lambda
+        lam *= sqrt(2) * 1e-5*sqrt(4*PI*$1*Ra*cm)
+
+        return L/lam
+}
+
+proc geom_nseg() {
+  //soma area(.5) // make sure diam reflects 3d points
+  forsec all { nseg = int((L/(0.1*lambda_f(100))+.9)/2)*2 + 1  }
+}
+
+proc position() { local i, x, y, z
+//For plotting the network volume the network should be inflated by scale factor 100. As this shows anatomically approximate positions.
+//For simulating a network. scale factors should be reduced. to 10 As it is workable and computationally efficient to contract space.
+//Since less voxels will be compared for distance in algorithm find_distances.
+
+    x = 10*$1  y = 10*$2  z = 10*$3 //Its an order of magnitude units incompatibility between the brain atlas and NEURON.
+    forall for i = 0, n3d()-1 { // forall of each cell as opposed to forall of the entire network.
+      pt3dchange(i, x+x3d(i),y+y3d(i), z+z3d(i), diam3d(i))
+    }//dend 
+}
+    
+    
+/*proc simplify_axon() {
+	//forsec axonal { delete_section() }
+	//create axon[2]
+	forsec "axon" {
+		all.append()
+		axonal.append()
+		somatic_axonal.append()
+	}
+}*/
+
+create soma[1]
+create dend[1]
+create apic[1]
+create axon[1]
+
+/*proc init() {
+     pp = new IntervalFire(.5)
+     pp.tau = 10
+     pp.invl = 20
+}
+proc connect2target() { $o2 = new NetCon(pp, $o1) }*/
+endtemplate cell
