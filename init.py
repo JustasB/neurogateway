@@ -8,17 +8,15 @@ import pdb
 # The readin flag when set enables the wiring to be read in from pre-existing 
 # pickled files with rank specific file names.
 from mpi4py import MPI
-
+import neuron as h
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(h,NCELL=60,readin=0)
+utils = Utils(NCELL=60,readin=0)
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:
     pass
 else:
     info_swc=utils.gcs(utils.NCELL)
-from neuron import h
-info_swc=utils.gcs(utils.NCELL)
 utils.wirecells()#wire cells on different hosts.
 #utils.h('forall{ for(x,0){ uninsert xtra}}')   #mechanism only needed for wiring cells not for simulating them. 
 

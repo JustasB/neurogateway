@@ -27,9 +27,9 @@ import os
 #from numpy import arange
 #@jit
 
-
+from neuron import h
 class Utils():
-    def __init__(self, h, NCELL=40,readin=0):
+    def __init__(self,NCELL=40,readin=0):
         #super(Utils, self).__init__(description)
         # To Do 
         # reduce the number of side effects associated with functions in this code
@@ -37,7 +37,10 @@ class Utils():
         # This will reduce the size of the interface, and increase modularity/maintainability.
         # The hocobject and its name space is designed in such a way that that modifying its state one function
         # will always result in global side effects.
-        setattr(self,'h',h)
+        #setattr(self,'h',h)
+        #h=h
+        #h=h
+        ##from neuron import h
         h('objref pc, py')
         h('pc = new ParallelContext()')
         h('py = new PythonObject()')
@@ -48,7 +51,7 @@ class Utils():
         setattr(self,'global_spike',tuple)
         self.tvec=h.Vector()
         self.gidvec=h.Vector()
-        self.has_cells=0
+        has_cells=0
         #self.readin=readin
         #self.synapse_list=[]
         self.stim = None
@@ -72,8 +75,8 @@ class Utils():
         self.cellmorphdict={}
         self.nclist = []
         self.seclists=[]
-        #self.tvec=self.h.Vector()    
-        #self.idvec=self.h.Vector() 
+        #self.tvec=h.Vector()    
+        #self.idvec=h.Vector() 
         self.icm = np.zeros((self.NCELL, self.NCELL))
         self.ecm = np.zeros((self.NCELL, self.NCELL))
         self.visited = np.zeros((self.NCELL, self.NCELL))
@@ -130,8 +133,9 @@ class Utils():
         '''
         assert len(markram)!=0
         bothtrans=[]                                                                      
-        bothtrans=[i for j,i in enumerate(markram) if "interneuron" in i ]
-        bothtrans=[i for j,i in enumerate(markram) if not "interneuron" in i if (j>=2*(len(bothtrans)/3.0))and(j<self.NCELL)]
+        bothtrans=[i for j,i in enumerate(markram) if "pyramid" in i if (j<=2*(self.NCELL/3.0))]
+        interneuron=[i for j,i in enumerate(markram) if "interneuron" in i ]#if (j>=2*(self.NCELL/3.0))     
+        bothtrans.extend(interneuron[0:int(2*(self.NCELL/3.0))])
         return bothtrans
             
     def make_cells(self,polarity):
@@ -139,7 +143,7 @@ class Utils():
         Round robin distribution (circular dealing of cells)
         https://en.wikipedia.org/wiki/Round-robin
         '''
-        h=self.h    
+        #from neuron import h    
         NCELL=self.NCELL
         SIZE=self.SIZE
         RANK=self.RANK
@@ -153,7 +157,7 @@ class Utils():
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
         for (j,i) in itergids:
-            self.has_cells=1#RANK specific attribute simplifies later code.
+            has_cells=1#RANK specific attribute simplifies later code.
             cell = h.mkcell(j)
             self.names_list[i]=j
             print cell, j,i 
@@ -188,7 +192,7 @@ class Utils():
         NCELL=self.NCELL
         SIZE=self.SIZE
         RANK=self.RANK
-        h=self.h    
+        #from neuron import h    
         pc=h.ParallelContext()     
         h('objref nc, cells')
         swcdict={}
@@ -198,11 +202,11 @@ class Utils():
         os.chdir(os.getcwd() + '/swclist') 
         self.make_cells(bothtrans)
         os.chdir(os.getcwd() + '/../')               
-        self.h.define_shape()        
-        self.h('forall{ for(x,0){ insert xtra }}')
-        self.h('forall{ for(x,0){ insert extracellular}}')    
-        self.h('xopen("interpxyz.hoc")')
-        self.h('grindaway()')    
+        h.define_shape()        
+        h('forall{ for(x,0){ insert xtra }}')
+        h('forall{ for(x,0){ insert extracellular}}')    
+        h('xopen("interpxyz.hoc")')
+        h('grindaway()')    
     
     def spike_gather(self):
         NCELL=self.NCELL
@@ -242,7 +246,7 @@ class Utils():
         return global_matrix
         
     def prun(self,tstop):
-        h=self.h    
+        #from neuron import h    
         pc=h.ParallelContext()
         NCELL=self.NCELL
         SIZE=self.SIZE
@@ -296,7 +300,7 @@ class Utils():
         '''
         search for viable synaptic vesicle sites.
         '''
-        h=self.h   
+        #from neuron import h   
         pc=h.ParallelContext()
         shiplist=[]
         h('objref coords') 
@@ -321,10 +325,10 @@ class Utils():
                                           dtype=np.float64)
                 coordict['gid']= int(j)
                 coordict['seg']= seg.x                    
-                secnames = self.h.cas().name()#sec.name()  
+                secnames = h.cas().name()#sec.name()  
                 coordict['secnames'] = str(secnames)
                 shiplist.append(coordict)
-                self.h.pop_section()
+                h.pop_section()
 
         '''                
         total_matrix=np.matrix(( 3,len(shiplist) ))
@@ -347,8 +351,8 @@ class Utils():
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
-        #from neuron import h
-        h=self.h  
+        ##from neuron import h
+        #from neuron import h  
         pc=h.ParallelContext()
         polarity = 0        
         polarity=int(h.Cell[int(cellind)].polarity)
@@ -385,9 +389,9 @@ class Utils():
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
-        from neuron import h
+        #from neuron import h
         pc=h.ParallelContext()
-        h=self.h
+        #from neuron import h
         self.visited[i][gidn] = self.visited[i][gidn] + 1              
         if r < 2.5: #2.5 micro metres.
             polarity = 0        
@@ -465,9 +469,9 @@ class Utils():
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
-        from neuron import h
+        #from neuron import h
         pc=h.ParallelContext()
-        h=self.h    
+        #from neuron import h    
         secnames = ''
         cellind =0 
         polarity = 0
@@ -581,7 +585,7 @@ class Utils():
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
-        h=self.h    
+        #from neuron import h    
         pc=h.ParallelContext()
         secnames = ''
         cellind =0 
@@ -654,14 +658,14 @@ class Utils():
         #
 
         '''
-        ncsize=len(self.h.NetCon)
+        ncsize=len(h.NetCon)
         NCELL=self.NCELL
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
         self.matrix_reduce()
         lsoftup=[]
-        for i, j in enumerate(self.h.NetCon):
+        for i, j in enumerate(h.NetCon):
             if type(j)!=None:
                 assert type(j)!=None
                 srcind=int(j.srcgid())
@@ -676,7 +680,7 @@ class Utils():
         import json
         import networkx as nx
         from networkx.readwrite import json_graph
-        h=self.h
+        #from neuron import h
         #import pickle
         #json_graph.node_link_graph
         #Create a whole network of both transmitter types.
@@ -727,10 +731,10 @@ class Utils():
         This code is no longer executed.
         morph4.hoc is executed instead.
         '''
-        h = self.h
-        swc = self.h.Import3d_SWC_read()
+        h = h
+        swc = h.Import3d_SWC_read()
         swc.input(morph_filename)
-        imprt = self.h.Import3d_GUI(swc, 0)
+        imprt = h.Import3d_GUI(swc, 0)
         h('execute("forall delete_section()",cell)')
         imprt.instantiate(cell)
         
@@ -759,7 +763,7 @@ class Utils():
         It is just good py-hoc example code.
         '''
 
-        h=self.h
+        #from neuron import h
         passive = self.description.data['fit'][type_index]['passive'][0]
         conditions = self.description.data['fit'][type_index]['conditions'][0]
         genome = self.description.data['fit'][type_index]['genome']
@@ -783,7 +787,7 @@ class Utils():
                     sec.insert(p["mechanism"])
                     h('print psection()')
                 setattr(sec, p["name"], p["value"])
-                self.h.pop_section()
+                h.pop_section()
         # Set reversal potentials
         for erev in conditions['erev']:
             sections = [s for s in cell.all if s.name().split(".")[1][:4] == erev["section"]]
@@ -793,18 +797,18 @@ class Utils():
 
 
     def setup_iclamp_step(self, target_cell, amp, delay, dur):
-        self.stim = self.h.IClamp(target_cell.soma[0](0.5))
+        self.stim = h.IClamp(target_cell.soma[0](0.5))
         self.stim.amp = amp
         self.stim.delay = delay
         self.stim.dur = dur
 
     def record_values(self):
         vec = { "v": {}, #define a dictionary.
-                "t": self.h.Vector() }
+                "t": h.Vector() }
         for i, cell in enumerate(self.cells):
-            vec["v"][int(cell.gid1)]=self.h.Vector()
+            vec["v"][int(cell.gid1)]=h.Vector()
             vec["v"][int(cell.gid1)].record(cell.soma[0](0.5)._ref_v)
-        vec["t"].record(self.h._ref_t)
+        vec["t"].record(h._ref_t)
     
         return vec
   
@@ -816,7 +820,7 @@ class Utils():
         h('gidvec = new Vector()')
         h('tvec = new Vector()')
         for cell in self.cells:
-            self.h.pc.spike_record(int(cell.gid1), self.h.tvec, self.h.idvec)
+            h.pc.spike_record(int(cell.gid1), h.tvec, h.idvec)
 
 
     #TODO use neuro electro to test cortical pyramidal cells, and baskett cells before including
@@ -895,7 +899,7 @@ class Utils():
         
     def my_decorator(self,some_function):
         def wrapper(self):
-            h=self.h    
+            #from neuron import h    
             NCELL=self.NCELL
             SIZE=self.COMM.size
             RANK=self.COMM.rank
