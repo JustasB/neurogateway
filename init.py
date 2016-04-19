@@ -10,7 +10,7 @@ import pdb
 from mpi4py import MPI
 
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(config,NCELL=60,readin=0)
+utils = Utils(h,NCELL=60,readin=0)
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:
@@ -18,7 +18,6 @@ if MPI.COMM.Get_rank()==0:
 else:
     info_swc=utils.gcs(utils.NCELL)
 from neuron import h
-utils = Utils(h,NCELL=60,readin=0)
 info_swc=utils.gcs(utils.NCELL)
 utils.wirecells()#wire cells on different hosts.
 #utils.h('forall{ for(x,0){ uninsert xtra}}')   #mechanism only needed for wiring cells not for simulating them. 
