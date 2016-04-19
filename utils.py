@@ -38,7 +38,7 @@ class Utils():
         # This will reduce the size of the interface, and increase modularity/maintainability.
         # The hocobject and its name space is designed in such a way that that modifying its state one function
         # will always result in global side effects.
-        
+        setattr(self,'h',h)
         h('objref pc, py')
         h('pc = new ParallelContext()')
         h('py = new PythonObject()')
@@ -90,7 +90,12 @@ class Utils():
         self.debugdata=[]
         self.names_list=np.zeros((self.NCELL, self.NCELL))
         self.global_names_list=np.zeros((self.NCELL, self.NCELL))
-
+        #h.xopen("cell.hoc")
+        #h.xopen("stdgui.hoc")
+        h('load_file("nrngui.hoc")')
+        h('load_file("import3d.hoc")')
+        h('load_file("morph4.hoc")')
+    
     def prep_list(self):                    
         '''
         find which list has the shortest length.
@@ -130,10 +135,10 @@ class Utils():
     #It's how you apply a decorator to a function
             
     def make_cells(self,polarity):
-        #Distribute cells across the hosts in a
-        #Round robin distribution (circular dealing of cells)
-        #https://en.wikipedia.org/wiki/Round-robin
-  
+        '''        Distribute cells across the hosts in a
+        Round robin distribution (circular dealing of cells)
+        https://en.wikipedia.org/wiki/Round-robin
+        '''
         h=self.h    
         NCELL=self.NCELL
         SIZE=self.SIZE
@@ -147,8 +152,7 @@ class Utils():
         
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
-        fit_ids = self.description.data['fit_ids'][0] #excitatory         
-        h.xopen("morph4.hoc")
+        #fit_ids = self.description.data['fit_ids'][0] #excitatory
         for (j,i) in itergids:
             self.has_cells=1#RANK specific attribute simplifies later code.
             cell = h.mkcell(j)
@@ -178,8 +182,10 @@ class Utils():
             self.cells.append(cell)
     
     def gcs(self,NCELL):
-        """Instantiate NEURON cell Objects in the Python variable space such
-        that all cells have unique identifiers."""
+        '''
+        Instantiate NEURON cell Objects in the Python variable space such
+        that all cells have unique identifiers.
+        '''
         NCELL=self.NCELL
         SIZE=self.SIZE
         RANK=self.RANK
@@ -188,11 +194,11 @@ class Utils():
         h('objref nc, cells')
         swcdict={}
         NFILE = 3175
-        fit_ids = self.description.data['fit_ids'][0]        
-        self.cells_data = self.description.data['biophys'][0]['cells']
+        #fit_ids = self.description.data['fit_ids'][0]        
+        #self.cells_data = self.description.data['biophys'][0]['cells']
         bothtrans=self.both_trans(self.prep_list())   
         self.names_list=[0 for x in xrange(0,len(bothtrans))]
-        os.chdir(os.getcwd() + '/main') 
+        os.chdir(os.getcwd() + '/swclist') 
         self.make_cells(bothtrans)
         os.chdir(os.getcwd() + '/../')               
         self.h.define_shape()        
