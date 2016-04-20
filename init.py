@@ -10,7 +10,7 @@ import pdb
 from mpi4py import MPI
 import neuron as h
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(NCELL=60,readin=0)
+utils = Utils(NCELL=15,readin=0)
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:
@@ -41,6 +41,8 @@ if utils.COMM.rank==0:
     ihubtuple=(outdegreei,indegreei)
     (outdegree,indegree)=hubs.hubs(utils.global_ecm)    
     hubtuple=(outdegree,indegree)
+hubtuple=0
+ihubtuple=0
 hubtuple = COMM.bcast(hubtuple, root=0)
 ihubtuple = COMM.bcast(ihubtuple, root=0)
 
@@ -70,7 +72,7 @@ tstop = 1570
 utils.COMM.barrier()
 utils.prun(tstop)
 if utils.COMM.rank==0:
-    vec=[]
+    vec={}
 utils.global_vec = utils.COMM.gather(vec,root=0) # Results in a list of dictionaries on rank 0 called utils.global_vec
 # Convert the list of dictionaries into one big dictionary called global_vec (type conversion).
 if utils.COMM.rank==0:
@@ -108,7 +110,7 @@ if utils.COMM.rank==0:
     tvec,gidvec=collate_spikes()
     utils.dumpjson_spike(tvec,gidvec)
     # open URL in running web browser
-    http_server.load_url('web/index.html')
+    #http_server.load_url('web/index.html')
 
 def plot_raster(tvec,gidvec):
     pallete=[[0.42,0.67,0.84],[0.50,0.80,1.00],[0.90,0.32,0.00],[0.34,0.67,0.67],[0.42,0.82,0.83],[0.90,0.59,0.00], 
@@ -125,9 +127,9 @@ def plot_raster(tvec,gidvec):
 if utils.COMM.rank==0:
     plot_raster(tvec,gidvec)
     # Compute the multivariate SPIKE distance
-    list_spike_trains = [ [] for i in xrange(0,int(np.max(gidvec)+1))] #define a list of lists.
+    list_spike_trains = [ i for i in xrange(0,int(np.max(gidvec)+1))] #define a list of lists.
     for i,j in enumerate(gidvec):
-        list_spike_trains[int(j)].append(tvec[int(i)])
+        list_spike_trains[int(j)]=int(tvec[int(i)])
     ti = 0
     tf = np.max(np.array(list_spike_trains))
     list_spike_trains=np.array(list_spike_trains).astype(int)

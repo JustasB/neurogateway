@@ -51,7 +51,7 @@ class Utils():
         setattr(self,'global_spike',tuple)
         self.tvec=h.Vector()
         self.gidvec=h.Vector()
-        has_cells=0
+        self.has_cells=0
         #self.readin=readin
         #self.synapse_list=[]
         self.stim = None
@@ -134,7 +134,7 @@ class Utils():
         assert len(markram)!=0
         bothtrans=[]                                                                      
         bothtrans=[i for j,i in enumerate(markram) if "pyramid" in i if (j<=2*(self.NCELL/3.0))]
-        interneuron=[i for j,i in enumerate(markram) if "interneuron" in i ]#if (j>=2*(self.NCELL/3.0))     
+        interneuron=[i for j,i in enumerate(markram) if "interneuron" in i ]   
         bothtrans.extend(interneuron[0:int(2*(self.NCELL/3.0))])
         return bothtrans
             
@@ -600,9 +600,6 @@ class Utils():
         #Iterate over all CPU ranks, iterate through all GIDs (global 
         #identifiers, stored in the python dictionary).
         if self.readin!=1:    
-            #for s in xrange(1, SIZE): #if rank==0, is free of neurons.
-            #print 's ', s, ' should start at 1 and increase.'
-            
             for s in xrange(0, SIZE):
                 
                 #Synchronise processes here, all ranks must have finished receiving 
@@ -627,7 +624,7 @@ class Utils():
                     print len(data)
             print('finished wiring of connectivity\n')
             fname='synapse_list'+str(RANK)+'.p'
-            assert len(self.synapse_list)!=0
+            if COMM.rank!=0: assert len(self.synapse_list)!=0
             with open(fname, 'wb') as handle:
                 pickle.dump(self.synapse_list, handle)
             fname='visited'+str(RANK)+'.p'
@@ -671,7 +668,7 @@ class Utils():
                 srcind=int(j.srcgid())
                 tgtind=int(j.postcell().gid1)
                 print int(j.srcgid()),int(j.postcell().gid1),self.celldict[srcind],self.celldict[tgtind]
-                lsoftup.append((int(utils.h.NetCon[i].srcgid()),int(utils.h.NetCon[i].postcell().gid1),utils.celldict[srcind],utils.celldict[tgtind]))
+                lsoftup.append((int(self.h.NetCon[i].srcgid()),int(self.h.NetCon[i].postcell().gid1),self.celldict[srcind],self.celldict[tgtind]))
         return lsoftup
       
         
@@ -707,14 +704,14 @@ class Utils():
         #http_server.load_url('force/force.html')
 
     def dumpjson_spike(self,tvec,gidvec):
-        assert utils.COMM.rank==0        
+        assert self.COMM.rank==0        
         import json
         import networkx as nx
         from networkx.readwrite import json_graph
         h=utils.h    
         d =[]
         d.append(self.global_namedict)
-        assert (type(tvec)!=type(utils.h) and type(gidvec)!=type(utils.h))
+        assert (type(tvec)!=type(self.h) and type(gidvec)!=type(self.h))
         d.append(tvec)
         d.append(gidvec)
         json.dump(d, open('web/js/spike.json','w'))
