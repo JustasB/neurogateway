@@ -41,6 +41,7 @@ class Utils():
         #h=h
         #h=h
         ##from neuron import h
+        self.h=h
         h('objref pc, py')
         h('pc = new ParallelContext()')
         h('py = new PythonObject()')
@@ -699,7 +700,6 @@ class Utils():
         d=None #destroy the object.    
         print('Wrote JSON data to web/js/network.json')
     
-        print('Wrote node-link JSON data to web/js/network.json')
         # open URL in running web browser
         #http_server.load_url('force/force.html')
 
@@ -708,7 +708,7 @@ class Utils():
         import json
         import networkx as nx
         from networkx.readwrite import json_graph
-        h=utils.h    
+        h=self.h    
         d =[]
         d.append(self.global_namedict)
         assert (type(tvec)!=type(self.h) and type(gidvec)!=type(self.h))
@@ -718,7 +718,7 @@ class Utils():
         d=json.load(open('web/js/spike.json','r'))
         #read the object just to prove that is readable.
         d=None #explicitly destroy the object, as garbage collection would do anyway.   
-        print('Wrote JSON data to web/js/network.json')
+        print('Wrote JSON data to web/js/spike.json')
     
    
 

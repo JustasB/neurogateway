@@ -10,7 +10,7 @@ import pdb
 from mpi4py import MPI
 import neuron as h
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(NCELL=15,readin=0)
+utils = Utils(NCELL=15,readin=1)
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:
@@ -30,6 +30,8 @@ if utils.COMM.rank==0:
 else:
     utils.h('forall{ for(x,0){ uninsert xtra}}')   #mechanism only needed for wiring cells not for simulating them.     
 
+hubtuple=0
+ihubtuple=0
 if utils.COMM.rank==0:
     hubs=NetStructure(utils,utils.global_ecm,utils.global_icm,utils.visited,utils.celldict)
     print 'experimental rig'
@@ -41,17 +43,22 @@ if utils.COMM.rank==0:
     ihubtuple=(outdegreei,indegreei)
     (outdegree,indegree)=hubs.hubs(utils.global_ecm)    
     hubtuple=(outdegree,indegree)
-hubtuple=0
-ihubtuple=0
-hubtuple = COMM.bcast(hubtuple, root=0)
-ihubtuple = COMM.bcast(ihubtuple, root=0)
-
-#check if these hubs are in the GID dictionary.
-
-#
 # This is a global gid, but I would need to bcast it to every host, 
 # and then check each host to see if that GID actually exists there.
-#
+hubtuple = MPI.COMM.bcast(hubtuple, root=0)
+ihubtuple = MPI.COMM.bcast(ihubtuple, root=0)
+
+print hubtuple, ihubtuple, ' broadcast hub values from rank0 bcast to every rank'
+#check if these hubs are in the GID dictionary.
+
+amplitude=0.57
+delay=20
+duration=600
+if hubtuple in utils.celldict.keys():
+    hubs.insert_cclamp(hubtuple[0],hubtuple[1],amplitude,delay,duration)
+
+if ihubtuple in utils.celldict.keys():
+    hubs.insert_cclamp(ihubtuple[0],ihubtuple[1],amplitude,delay,duration)
 
 hubs=NetStructure(utils,utils.ecm,utils.icm,utils.visited,utils.celldict)
 (outdegreei,indegreei)=hubs.hubs(utils.global_icm)    
@@ -68,7 +75,7 @@ hubs.insert_cclamp(hubs.outdegree,hubs.indegree,amplitude,delay,duration)
 if utils.COMM.rank!=0:
     vec = utils.record_values()
 print 'setup recording'
-tstop = 1570
+tstop = 2570
 utils.COMM.barrier()
 utils.prun(tstop)
 if utils.COMM.rank==0:
@@ -85,9 +92,15 @@ if utils.COMM.rank==0:
     plt.hold(True) #seems to be unecessary function call.
     #TODO outsource management of membrane traces to neo/elephant.
     #TODO use allreduce to reduce python dictionary to rank0
+    f=open('membrane_traces','w')
+    import json
+    jtl=[]
+
     for gid,v in utils.global_vec['v'].iteritems():
+        jtl.append((utils.global_vec['t'].to_python(),v.to_python()))
         plt.plot(utils.global_vec['t'].to_python(),v.to_python())
     fig.savefig('membrane_traces_from_all_ranks'+str(utils.COMM.rank)+'.png')    
+    json.dump(jtl,f)
     plt.hold(False) #seems to be unecessary function call.
     plt.xlabel('time (ms)')
     plt.ylabel('Voltage (mV)')
