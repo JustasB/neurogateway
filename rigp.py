@@ -4,7 +4,6 @@
 
 '''
 import unittest
-import networkx
 from mpi4py import MPI
 import numpy as np
         
@@ -40,16 +39,18 @@ class NetStructure():
         self.stim.dur = dur
         
         
+    '''
+    Networkx is not available on the Neuroscience gateway cluster.
 
     def net_stat(self):
-        '''
+       
         This method is called on every rank with graphs that contain only partial connectivity information.
         If there are two equal structural out-degree hubs this method only finds the first one.
-        '''
+        
         excin=networkx.in_degree_centrality(networkx.DiGraph(self.global_ecm))
         excout=networkx.in_degree_centrality(networkx.DiGraph(self.global_ecm))
         return (excin,excout)
-
+    '''
     def hubs(self, global_numpy_matrix):
         '''
         This method is called only on rank 0 with a complete list of global identifiers.
