@@ -107,13 +107,10 @@ class Utils():
         '''
         cil = pickle.load(open('cellinfolist.p', 'rb'))
         cil.remove(cil[0])#The first list element is the column titles.
-        #inhibitory = map(lambda cil : cil if i[5]!="interneuron", i)
         cil = [i for i in cil if int(len(i))>9 ]
         assert len(cil)!=0
         markram = [i for i in cil if "Markram" in i]
         aspiny=[i for i in cil if not "interneuron" in i if not "pyramid" in i]
-        #stellate=[i for i in aspiny if "stellate" in i]
-        #basket=[i for i in cil if "basket" in i]
         return markram
     
     def _move_cells(self):
