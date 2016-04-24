@@ -9,7 +9,6 @@ import glob
 from mpi4py import MPI
 import numpy as np
 import logging
-import networkx
 from copy import deepcopy
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -76,20 +75,12 @@ class Utils():
         self.cellmorphdict={}
         self.nclist = []
         self.seclists=[]
-        #self.tvec=h.Vector()    
-        #self.idvec=h.Vector() 
         self.icm = np.zeros((self.NCELL, self.NCELL))
         self.ecm = np.zeros((self.NCELL, self.NCELL))
         self.visited = np.zeros((self.NCELL, self.NCELL))
-        self.ecg = networkx.DiGraph()
-        self.icg = networkx.DiGraph()
-        self.whole_net = networkx.DiGraph()
         self.global_visited = np.zeros_like(self.icm)
         self.global_icm = np.zeros_like(self.icm)
         self.global_ecm = np.zeros_like(self.ecm)
-        self.global_ecg = networkx.DiGraph()
-        self.global_icg = networkx.DiGraph()
-        self.global_whole_net = networkx.DiGraph()
         self.debugdata=[]
         self.names_list=np.zeros((self.NCELL, self.NCELL))
         self.global_names_list=np.zeros((self.NCELL, self.NCELL))
@@ -545,9 +536,9 @@ class Utils():
                         r = float(r)                      
                         self.alloc_synapse(r,h,sec,seg,cellind,secnames,k,i,gidn)
 
-
+    '''
     def destroy_isolated_cells(self):        
-        '''
+        
         To be called locally on every rank
         This method is intended to do two things.
         First it finds and deletes isolated nodes from the 3 networkx objects with degree 0.
@@ -555,7 +546,7 @@ class Utils():
         Then it intends destroys the associated HOC cell objects with degree 0.
         If this does not prove fatal to the subsequent NEURON simulation. 
         
-        '''
+        
         import networkx as nx
         self.whole_net=nx.compose(self.ecg, self.icg)
         
@@ -573,7 +564,7 @@ class Utils():
         #    cell=pc.gid2cell(i)
              
         #    h('objref cell')
-            
+    '''    
     def wirecells(self):
         """This function constitutes the outermost loop of the parallel wiring algor
         The function returns two adjacency matrices. One matrix whose elements are excitatory connections and another matrix of inhibitory connections"""
@@ -628,7 +619,7 @@ class Utils():
             fname='visited'+str(RANK)+'.p'
             with open(fname, 'wb') as handle:
                 pickle.dump(self.visited,handle)
-            self.destroy_isolated_cells()
+            #self.destroy_isolated_cells()
         else:
             #if COMM.rank!=0:               
             fname='synapse_list'+str(RANK)+'.p'
@@ -637,7 +628,7 @@ class Utils():
                 #for s in self.synapse_list:
                 for (r,post_syn,cellind,k,gidn,i) in self.synapse_list:
                     self.alloc_synapse_ff(r,post_syn,cellind,k,gidn,i)
-            self.destroy_isolated_cells()
+            #destroy_isolated_cells()
 
   
     def tracenet(self):
@@ -673,23 +664,9 @@ class Utils():
     def dumpjson_graph(self):
         assert self.COMM.rank==0        
         import json
-        import networkx as nx
-        from networkx.readwrite import json_graph
-        #from neuron import h
-        #import pickle
-        #json_graph.node_link_graph
-        #Create a whole network of both transmitter types.
-        self.global_whole_net=nx.compose(self.global_ecg, self.global_icg)
-        self.global_whole_net.remove_nodes_from(nx.isolates(self.global_whole_net))
-        self.global_icg.remove_nodes_from(nx.isolates(self.global_icg))
-        self.global_ecg.remove_nodes_from(nx.isolates(self.global_ecg))
-        
         d =[]
-        whole=nx.to_numpy_matrix(self.global_whole_net)  
-        #TODO sort whole (network) here in Python, as Python is arguably easier to understand than JS. 
+        whole=self.global_ecm+self.global_icm
         d.append(whole.tolist()) 
-        #d.append(self.global_whole_net.tolist())
-        #d.append(json_graph.node_link_data(self.global_whole_net))                 
         d.append(self.global_namedict)
         json.dump(d, open('web/js/global_whole_network.json','w'))
         d=json.load(open('web/js/global_whole_network.json','r'))
@@ -703,8 +680,6 @@ class Utils():
     def dumpjson_spike(self,tvec,gidvec):
         assert self.COMM.rank==0        
         import json
-        import networkx as nx
-        from networkx.readwrite import json_graph
         h=self.h    
         d =[]
         d.append(self.global_namedict)
@@ -820,6 +795,7 @@ class Utils():
     #TODO use neuro electro to test cortical pyramidal cells, and baskett cells before including
     #them in the network.
     #Call a method test_cell inside the make_cells function.
+    '''
     def test_cell(self,d):#celltype='hip_pyr'):
         from neuronunit.neuroelectro import NeuroElectroSummary
         from neuronunit import neuroelectro
@@ -890,7 +866,7 @@ class Utils():
         if 'dg_basket' in d:
             x.set_neuron(nlex_id='nlx_cell_100201')
             pass
-        
+    '''    
     def my_decorator(self,some_function):
         def wrapper(self):
             #from neuron import h    
