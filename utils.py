@@ -127,7 +127,7 @@ class Utils():
         bothtrans.extend(interneuron[0:int(2*(self.NCELL/3.0))])
         return bothtrans
             
-    def make_cells(self,polarity):
+    def make_cells(self,cell_list):
         '''        Distribute cells across the hosts in a
         Round robin distribution (circular dealing of cells)
         https://en.wikipedia.org/wiki/Round-robin
@@ -140,8 +140,11 @@ class Utils():
         h('objref tvec, gidvec')
         h('gidvec = new Vector()')
         h('tvec = new Vector()')
-        d = { x: y for x,y in enumerate(polarity)} 
-        itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
+        print len(cell_list)
+        pdb.set_trace()
+        d = { x: y for x,y in enumerate(cell_list)} 
+        #itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
+        itergids = iter( (d[i][3],i) for i in range(RANK, len(cell_list), SIZE) )
         
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
@@ -154,7 +157,7 @@ class Utils():
             cell.gid1=i 
             cell.name=j
             #excitatory neuron.
-            self.test_cell(d[i])
+            #self.test_cell(d[i])
             if 'pyramid' in d[i]:                
                 cell.pyr()
                 cell.polarity=1                        
