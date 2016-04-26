@@ -475,22 +475,6 @@ class Utils():
         h('objref coords2') 
         h('coords2 = new Vector(3)')
         for q,s in enumerate(data):
-            
-            def test_wiring(q,s,data):
-                '''
-                A test of to see if variables are updating properly.
-                The concatonation of section and segment iterables
-                will always yield a unique string, if and when the iteraterators update.
-                '''
-                if q+1<=len(s):
-                    print len(s),' ',q,' ',q+1
-                    print type(s), type(s[q])
-                    left=(str(s[q]['secnames'])+str(s[q]['seg']))
-                    right=(str(s[q+1]['secnames'])+str(s[q+1]['seg']))
-                    print left, right 
-                    assert left!=right
-                         
-            test_wiring(q,s,data)
             for t in s:
                 k={} #The only point of this redundantvariable switching is to force the dictionary k to be redclared 
                 k=t #such that it is not prevented from updating
