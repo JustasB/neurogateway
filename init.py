@@ -10,7 +10,7 @@ import pdb
 from mpi4py import MPI
 import neuron as h
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(NCELL=250,readin=0)
+utils = Utils(NCELL=190,readin=0)
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:

@@ -104,14 +104,15 @@ class Utils():
         aspiny=[i for i in cil if not "interneuron" in i if not "pyramid" in i]
         return markram
     
-    def _move_cells(self):
+    #ef _move_cells(self):
         '''
         Not something that would typically be executed.
         '''
-        for m in markram:
-            execute_string='mv main/'+m[len(m)-2]+' swcfolder'
-            print execute_string
-            os.system(execute_string)        
+        #for m in markram:
+            #execute_string='mv main/'+m[len(m)-2]+' swcfolder'
+            #execute_string='git add swcfolder
+            #print execute_string
+        #    os.system(execute_string)        
         
     	return markram
     
