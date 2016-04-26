@@ -141,10 +141,10 @@ class Utils():
         h('gidvec = new Vector()')
         h('tvec = new Vector()')
         print len(cell_list)
-        pdb.set_trace()
+        #pdb.set_trace()
         d = { x: y for x,y in enumerate(cell_list)} 
         #itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
-        itergids = iter( (d[i][3],i) for i in range(RANK, len(cell_list), SIZE) )
+        itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
         
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
@@ -351,11 +351,11 @@ class Utils():
         if polarity==1:
             #TODO pickle load the graphs here instead of making them manually.
             self.ecm[i][gidn] = self.ecm[i][gidn] + 1
-            self.ecg.add_edge(i,gidn,weight=r/0.4)
+            #self.ecg.add_edge(i,gidn,weight=r/0.4)
             assert np.sum(self.ecm)!=0
         else:
             self.icm[i][gidn] = self.icm[i][gidn] + 1
-            self.icg.add_edge(i,gidn,weight=r/0.4)
+            #self.icg.add_edge(i,gidn,weight=r/0.4)
             assert np.sum(self.icm)!=0                
             #TODO Add other edge attributes like secnames etc.
         print post_syn
@@ -393,9 +393,9 @@ class Utils():
                 post_syn = secnames + ' ' + 'syn_ = new FastInhib(' + str(seg.x) + ')'
                 #post_syn = secnames + ' ' + 'syn_ = new GABAa(' + str(seg.x) + ')'
                 self.icm[i][gidn] = self.icm[i][gidn] + 1
-                self.icg.add_edge(i,gidn,weight=r/0.4)
-                self.icg[i][gidn]['post_loc']=secnames
-                self.icg[i][gidn]['pre_loc']=k['secnames']
+                #self.icg.add_edge(i,gidn,weight=r/0.4)
+                #self.icg[i][gidn]['post_loc']=secnames
+                #self.icg[i][gidn]['pre_loc']=k['secnames']
                 assert np.sum(self.icm)!=0
         
             else:
@@ -403,18 +403,18 @@ class Utils():
                     #TODO Find standard open source brain affiliated code for NMDA synapse
                     post_syn = secnames + ' ' + 'syn_ = new AmpaNmda(' + str(seg.x) + ')'                       
                     self.ecm[i][gidn] = self.ecm[i][gidn] + 1
-                    self.ecg.add_edge(i,gidn,weight=r/0.4)
-                    self.ecg[i][gidn]['post_loc']=secnames
-                    self.ecg[i][gidn]['pre_loc']=k['secnames']
+                    #self.ecg.add_edge(i,gidn,weight=r/0.4)
+                    #self.ecg[i][gidn]['post_loc']=secnames
+                    #self.ecg[i][gidn]['pre_loc']=k['secnames']
                     self.seclists.append(secnames)
                     assert np.sum(self.ecm)!=0
                 else:
                     #TODO Find standard open source brain affiliated code for NMDA synapse
                     post_syn = secnames + ' ' + 'syn_ = new ExpSid(' + str(seg.x) + ')'                       
                     self.ecm[i][gidn] = self.ecm[i][gidn] + 1
-                    self.ecg.add_edge(i,gidn,weight=r/0.4)
-                    self.ecg[i][gidn]['post_loc']=secnames
-                    self.ecg[i][gidn]['pre_loc']=k['secnames']
+                    #self.ecg.add_edge(i,gidn,weight=r/0.4)
+                    #self.ecg[i][gidn]['post_loc']=secnames
+                    #self.ecg[i][gidn]['pre_loc']=k['secnames']
                     self.seclists.append(secnames)
                     assert np.sum(self.ecm)!=0
         
