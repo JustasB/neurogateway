@@ -62,21 +62,15 @@ class NetStructure():
         indegree=np.where(rowsums == np.max(rowsums))[0][0]
         return (outdegree, indegree)
 
-    def insert_cclamp(self,outdegree,indegree,amplitude,delay,duration):
-        if outdegree in self.celldict.keys():
-            self.setup_iclamp_step(self.celldict[int(outdegree)], amplitude,delay,duration)#0.27, 1020.0, 750.0) 
-        if indegree in self.celldict.keys():
-            self.setup_iclamp_step(self.celldict[int(indegree)], amplitude,delay,duration)#0.27, 1020.0, 750.0)  
-        
+    def insert_cclamp(self,input_gid,amplitude,delay,duration):
+        if input_gid in self.celldict.keys():
+            self.setup_iclamp_step(self.celldict[int(input_gid)], amplitude,delay,duration) 
+            print 'inserted IC clamp'
     def save_matrix(self):    
         #save and plot matrix.
         SIZE=self.SIZE
         RANK=self.RANK
         #TODO replace with plotly.
-        import matplotlib 
-        matplotlib.use('Agg') 
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import LogNorm 
         import pickle
         assert self.COMM.rank==0
         with open('excitatory_matrix.p', 'wb') as handle:
@@ -84,6 +78,12 @@ class NetStructure():
         with open('inhibitory_matrix.p', 'wb') as handle:
             pickle.dump(self.global_icm, handle)
         print 'connection matrices saved'
+        '''
+        import matplotlib 
+        matplotlib.use('Agg') 
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm 
+        
         fig = plt.figure()
         fig.clf()
 
@@ -132,7 +132,7 @@ class NetStructure():
 
         sfin = 'Inhibitory_Adjacency_Matrix.png'
         fig.savefig(sfin)
-
+        '''
 
     def record_values(self):
         vec = { "v": [],

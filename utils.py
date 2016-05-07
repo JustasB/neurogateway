@@ -135,6 +135,7 @@ class Utils():
         Round robin distribution (circular dealing of cells)
         https://en.wikipedia.org/wiki/Round-robin
         '''
+        import neuron
         from neuron import h    
         coords = [0 for i in xrange(0,3)]#define list as a local variable.
         h('objref py')
@@ -148,12 +149,9 @@ class Utils():
         h('tvec = new Vector()')
         print len(cell_list)
         d = { x: y for x,y in enumerate(cell_list)} 
-        itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
-        
+        itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )       
         #Create a dictionary, where keys are soma centre coordinates to check for two cells occupying the same position.
-        #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.
-        h('xopen("../interpxyz.hoc")')
-         
+        #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.         
         checkd={} 
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
@@ -165,46 +163,17 @@ class Utils():
             cell.geom_nseg()
             cell.gid1=i 
             cell.name=j
-            # Populate the dictionary with appropriate keys.
-            '''
-            sec=cell.soma[0]
-            
+            # Populate the dictionary with appropriate keys for the sanity check.
+           
+            sec=cell.soma[0]        
             sec.push()
-            pdb.set_trace()
-            
-            print sec.x3d()
-            h('insert xtra')
-            h('insert extracellular')    
-            h('grindaway()')    
-            h('x_xtra(0.5) ')
-
-            h('py.coords[0]=x_xtra(0.5)')
-            h('py.coords[1]=y_xtra(0.5)')
-            h('py.coords[2]=z_xtra(0.5)')
-            print coords[0]
-            assert (coords[0])!=0
-            pdb.set_trace()
-
-            get_cox = str('coords[1]=x_xtra('
-                          + str(0.5) + ')')
-            h(get_cox)                   
-            get_coy = str('coords[1]=y_xtra('
-                          + str(0.5) + ')')
-            h(get_coy)
-            get_coz = str('coords[2]=z_xtra('
-                          + str(0.5) + ')')
-            h(get_coz)
-            key_checkd=str(h.coords.x[0])+str(h.coords.x[1])+str(h.coords.x[2])
-
-            secnames = h.cas().name() #This line not really necessary.
+            key_checkd=str(neuron.h.x3d(0))+str(neuron.h.y3d(0))+str(neuron.h.z3d(0))
             #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
             #Additionally I may as well make a plot of soma positions.
             #assert !(key_checkd in checkd.keys()) #If the key is not in the dictionary, then add it and proceed with the business of cell instantiation.
-            checkd[key_checkd] = (j, str(h.coords.x[0]), str(h.coords.x[1]), str(h.coords.x[2]) ) 
+            checkd[key_checkd] = (j, str(neuron.h.x3d(0)),str(neuron.h.y3d(0)),str(neuron.h.z3d(0)) ) 
             print key_checkd, checkd[key_checkd]
             h.pop_section()
-            '''
-
             #excitatory neuron.
             #self.test_cell(d[i])
             if 'pyramid' in d[i]:                
@@ -224,6 +193,7 @@ class Utils():
             assert None!=pc.gid2cell(i)
             self.celldict[i]=cell
             self.cells.append(cell)
+        checkd=None#Garbage collector will destroy but may as well explicitly dispose of the sanity check data.   
     
     def gcs(self,NCELL):
         '''

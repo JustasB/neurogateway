@@ -54,11 +54,12 @@ print hubtuple, ihubtuple, ' broadcast hub values from rank0 bcast to every rank
 amplitude=0.57
 delay=20
 duration=600
-if hubtuple in utils.celldict.keys():
-    hubs.insert_cclamp(hubtuple[0],hubtuple[1],amplitude,delay,duration)
-
-if ihubtuple in utils.celldict.keys():
-    hubs.insert_cclamp(ihubtuple[0],ihubtuple[1],amplitude,delay,duration)
+if (hubtuple[0] in utils.celldict.keys():
+    hubs.insert_cclamp(hubtuple[0],amplitude,delay,duration)
+    print 'inserted Clamp'
+if ihubtuple[1] in utils.celldict.keys():
+    hubs.insert_cclamp(ihubtuple[1],amplitude,delay,duration)
+    print 'inserted Clamp'
 
 hubs=NetStructure(utils,utils.ecm,utils.icm,utils.visited,utils.celldict)
 (outdegreei,indegreei)=hubs.hubs(utils.global_icm)    
@@ -75,7 +76,7 @@ hubs.insert_cclamp(hubs.outdegree,hubs.indegree,amplitude,delay,duration)
 if utils.COMM.rank!=0:
     vec = utils.record_values()
 print 'setup recording'
-tstop = 3570
+tstop = 13570
 utils.COMM.barrier()
 utils.prun(tstop)
 if utils.COMM.rank==0:
@@ -100,8 +101,8 @@ if utils.COMM.rank==0:
     for gid,v in utils.global_vec['v'].iteritems():
         jtl.append((utils.global_vec['t'].to_python(),v.to_python()))
         plt.plot(utils.global_vec['t'].to_python(),v.to_python())
-    json.dump(jtl,f)
     f=open('membrane_traces','w')
+    json.dump(jtl,f)
     fig.savefig('membrane_traces_from_all_ranks'+str(utils.COMM.rank)+'.png')    
     plt.hold(False) #seems to be unecessary function call.
     plt.xlabel('time (ms)')
@@ -167,7 +168,7 @@ if utils.COMM.rank==0:
     print('simulation is finished, bye, its been fun :)') 
 
 print ('now that the simulation is done, just checking to see if NSG can import the following packages:')
-import plotly #A test to see if this module is present on the NSG.
+#import plotly #A test to see if this module is present on the NSG.
 import numba #
 print ('packages imported okay, good night')
 
