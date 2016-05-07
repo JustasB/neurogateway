@@ -164,6 +164,13 @@ if utils.COMM.rank==0:
     d.append(Sb.tolist())
     json.dump(d, open('web/js/spike_distance.json','w'))    
     print('Wrote node-link JSON data to web/js/network.json')
+    print('simulation is finished, bye, its been fun :)') 
+
+print ('now that the simulation is done, just checking to see if NSG can import the following packages:')
+import plotly #A test to see if this module is present on the NSG.
+import numba #
+print ('packages imported okay, good night')
+
 #Probably just get the spike distance.
 
 #import http_server as hs

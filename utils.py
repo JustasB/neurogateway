@@ -27,8 +27,6 @@ import os
 #from numpy import arange
 #@jit
 
-import plotly #A test to see if this module is present on the NSG.
-
 
 from neuron import h
 class Utils():
@@ -163,8 +161,6 @@ class Utils():
             cell.geom_nseg()
             cell.gid1=i 
             cell.name=j
-
-
             # Populate the dictionary with appropriate keys.
             for sec in cell.soma[0]:
                 sec.push()
@@ -179,14 +175,10 @@ class Utils():
                 h(get_coz)
                 key_checkd=str(h.coords.x[0])+str(h.coords.x[1])+str(h.coords.x[2])
                 secnames = h.cas().name() #This line not really necessary.
-
                 #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
                 #Additionally I may as well make a plot of soma positions.
-               
                 assert !key_checkd in checkd #If the key is not in the dictionary, then add it and proceed with the business of cell instantiation.
-
                 checkd[key_checkd] = (j, str(h.coords.x[0]), str(h.coords.x[1]), str(h.coords.x[2]) ) 
-                #TODO 
                 print key_checkd, checkd[key_checkd]
                 h.pop_section()
 
