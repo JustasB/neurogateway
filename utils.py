@@ -135,7 +135,10 @@ class Utils():
         Round robin distribution (circular dealing of cells)
         https://en.wikipedia.org/wiki/Round-robin
         '''
-        #from neuron import h    
+        from neuron import h    
+        coords = [0 for i in xrange(0,3)]#define list as a local variable.
+        h('objref py')
+        h('py = new PythonObject()')
         NCELL=self.NCELL
         SIZE=self.SIZE
         RANK=self.RANK
@@ -149,7 +152,8 @@ class Utils():
         
         #Create a dictionary, where keys are soma centre coordinates to check for two cells occupying the same position.
         #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.
-        
+        h('xopen("../interpxyz.hoc")')
+         
         checkd={} 
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
@@ -162,26 +166,44 @@ class Utils():
             cell.gid1=i 
             cell.name=j
             # Populate the dictionary with appropriate keys.
-            for sec in cell.soma[0]:
-                sec.push()
-                get_cox = str('coords.x[0]=x_xtra('
-                              + str(0.5) + ')')
-                h(get_cox)                   
-                get_coy = str('coords.x[1]=y_xtra('
-                              + str(0.5) + ')')
-                h(get_coy)
-                get_coz = str('coords.x[2]=z_xtra('
-                              + str(0.5) + ')')
-                h(get_coz)
-                key_checkd=str(h.coords.x[0])+str(h.coords.x[1])+str(h.coords.x[2])
-                secnames = h.cas().name() #This line not really necessary.
-                #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
-                #Additionally I may as well make a plot of soma positions.
-                assert !key_checkd in checkd #If the key is not in the dictionary, then add it and proceed with the business of cell instantiation.
-                checkd[key_checkd] = (j, str(h.coords.x[0]), str(h.coords.x[1]), str(h.coords.x[2]) ) 
-                print key_checkd, checkd[key_checkd]
-                h.pop_section()
+            '''
+            sec=cell.soma[0]
+            
+            sec.push()
+            pdb.set_trace()
+            
+            print sec.x3d()
+            h('insert xtra')
+            h('insert extracellular')    
+            h('grindaway()')    
+            h('x_xtra(0.5) ')
 
+            h('py.coords[0]=x_xtra(0.5)')
+            h('py.coords[1]=y_xtra(0.5)')
+            h('py.coords[2]=z_xtra(0.5)')
+            print coords[0]
+            assert (coords[0])!=0
+            pdb.set_trace()
+
+            get_cox = str('coords[1]=x_xtra('
+                          + str(0.5) + ')')
+            h(get_cox)                   
+            get_coy = str('coords[1]=y_xtra('
+                          + str(0.5) + ')')
+            h(get_coy)
+            get_coz = str('coords[2]=z_xtra('
+                          + str(0.5) + ')')
+            h(get_coz)
+            key_checkd=str(h.coords.x[0])+str(h.coords.x[1])+str(h.coords.x[2])
+
+            secnames = h.cas().name() #This line not really necessary.
+            #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
+            #Additionally I may as well make a plot of soma positions.
+            #assert !(key_checkd in checkd.keys()) #If the key is not in the dictionary, then add it and proceed with the business of cell instantiation.
+            checkd[key_checkd] = (j, str(h.coords.x[0]), str(h.coords.x[1]), str(h.coords.x[2]) ) 
+            print key_checkd, checkd[key_checkd]
+            h.pop_section()
+            '''
 
             #excitatory neuron.
             #self.test_cell(d[i])
