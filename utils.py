@@ -22,9 +22,13 @@ import pickle
 import json
 import os
 
+#Numba, something I should include in the optimizer package.
 #from numba import jit
 #from numpy import arange
 #@jit
+
+import plotly #A test to see if this module is present on the NSG.
+
 
 from neuron import h
 class Utils():
@@ -142,11 +146,13 @@ class Utils():
         h('gidvec = new Vector()')
         h('tvec = new Vector()')
         print len(cell_list)
-        #pdb.set_trace()
         d = { x: y for x,y in enumerate(cell_list)} 
-        #itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
         itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )
         
+        #Create a dictionary, where keys are soma centre coordinates to check for two cells occupying the same position.
+        #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.
+        
+        checkd={} 
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
         for (j,i) in itergids:
@@ -157,6 +163,34 @@ class Utils():
             cell.geom_nseg()
             cell.gid1=i 
             cell.name=j
+
+
+            # Populate the dictionary with appropriate keys.
+            for sec in cell.soma[0]:
+                sec.push()
+                get_cox = str('coords.x[0]=x_xtra('
+                              + str(0.5) + ')')
+                h(get_cox)                   
+                get_coy = str('coords.x[1]=y_xtra('
+                              + str(0.5) + ')')
+                h(get_coy)
+                get_coz = str('coords.x[2]=z_xtra('
+                              + str(0.5) + ')')
+                h(get_coz)
+                key_checkd=str(h.coords.x[0])+str(h.coords.x[1])+str(h.coords.x[2])
+                secnames = h.cas().name() #This line not really necessary.
+
+                #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
+                #Additionally I may as well make a plot of soma positions.
+               
+                assert !key_checkd in checkd #If the key is not in the dictionary, then add it and proceed with the business of cell instantiation.
+
+                checkd[key_checkd] = (j, str(h.coords.x[0]), str(h.coords.x[1]), str(h.coords.x[2]) ) 
+                #TODO 
+                print key_checkd, checkd[key_checkd]
+                h.pop_section()
+
+
             #excitatory neuron.
             #self.test_cell(d[i])
             if 'pyramid' in d[i]:                
@@ -344,8 +378,6 @@ class Utils():
         SIZE=self.SIZE
         COMM = self.COMM
         RANK=self.RANK
-        ##from neuron import h
-        #from neuron import h  
         pc=h.ParallelContext()
         polarity = 0        
         polarity=int(h.Cell[int(cellind)].polarity)

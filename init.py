@@ -10,7 +10,7 @@ import pdb
 from mpi4py import MPI
 import neuron as h
 MPI.COMM = MPI.COMM_WORLD
-utils = Utils(NCELL=190,readin=0)
+utils = Utils(NCELL=190,readin=1) #Read in the pre-established wiring files to speed up the simulation.
 
 print MPI.COMM.Get_rank(), 'mpi rank'
 if MPI.COMM.Get_rank()==0:
@@ -66,16 +66,16 @@ hubs=NetStructure(utils,utils.ecm,utils.icm,utils.visited,utils.celldict)
 # A local analysis of hub nodes, using local incomplete adjacency matrices.
 amplitude=0.27 #pA or nA?
 delay=15# was 1020.0 ms, as this was long enough to notice unusual rebound spiking
-duration=400.0 #was 750 ms, however this was much too long.
+duration=500.0 #was 750 ms, however this was much too long.
 hubs.insert_cclamp(outdegreei,indegreei,amplitude,delay,duration)
 amplitude=0.27 #pA or nA?
 delay=200# was 1020.0 ms, as this was long enough to notice unusual rebound spiking
-duration=400.0 #was 750 ms, however this was much too long.
+duration=1000.0 #was 750 ms, however this was much too long.
 hubs.insert_cclamp(hubs.outdegree,hubs.indegree,amplitude,delay,duration)
 if utils.COMM.rank!=0:
     vec = utils.record_values()
 print 'setup recording'
-tstop = 2570
+tstop = 3570
 utils.COMM.barrier()
 utils.prun(tstop)
 if utils.COMM.rank==0:
@@ -92,15 +92,17 @@ if utils.COMM.rank==0:
     plt.hold(True) #seems to be unecessary function call.
     #TODO outsource management of membrane traces to neo/elephant.
     #TODO use allreduce to reduce python dictionary to rank0
-    f=open('membrane_traces','w')
+    
     import json
     jtl=[]
 
+    #plt.hold(False) #seems to be unecessary function call.
     for gid,v in utils.global_vec['v'].iteritems():
         jtl.append((utils.global_vec['t'].to_python(),v.to_python()))
         plt.plot(utils.global_vec['t'].to_python(),v.to_python())
-    fig.savefig('membrane_traces_from_all_ranks'+str(utils.COMM.rank)+'.png')    
     json.dump(jtl,f)
+    f=open('membrane_traces','w')
+    fig.savefig('membrane_traces_from_all_ranks'+str(utils.COMM.rank)+'.png')    
     plt.hold(False) #seems to be unecessary function call.
     plt.xlabel('time (ms)')
     plt.ylabel('Voltage (mV)')
