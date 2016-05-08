@@ -194,7 +194,7 @@ class Utils():
             assert None!=pc.gid2cell(i)
             self.celldict[i]=cell
             self.cells.append(cell)
-    
+    '''
     def plot_cell_centre(self,cell_list):
         import neuron
         from neuron import h    
@@ -267,6 +267,7 @@ class Utils():
         if 'Darwin' in plat:
             import plotly.plotly as py
             import plotly.graph_objs as go
+            plotly.offline.plot({
             trace1 = go.Scatter3d(
                 x=plotx,
                 y=ploty,
@@ -292,15 +293,17 @@ class Utils():
                     t=0
                 )
             )
+            })
             fig = go.Figure(data=data, layout=layout)
             plot_url = py.plot(fig, filename='soma centre positions')
             from neuronvisio.controls import Controls
             controls = Controls()
+        checkd=None
+
         '''
         TODO plot all of these cell centres in java script, and or plotly
         import plotly    
         '''
-        checkd=None
     def gcs(self,NCELL):
         '''
         Instantiate NEURON cell Objects in the Python variable space such
