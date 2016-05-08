@@ -196,6 +196,11 @@ class Utils():
             self.cells.append(cell)
     '''
     def plot_cell_centre(self,cell_list):
+
+        Method string:
+        plot all of these cell centres in java script, and or plotly
+        Either run make cells or this method but not both.
+                
         import neuron
         from neuron import h    
         coords = [0 for i in xrange(0,3)]#define list as a local variable.
@@ -299,10 +304,6 @@ class Utils():
             from neuronvisio.controls import Controls
             controls = Controls()
         checkd=None
-
-        '''
-        TODO plot all of these cell centres in java script, and or plotly
-        import plotly    
         '''
     def gcs(self,NCELL):
         '''
