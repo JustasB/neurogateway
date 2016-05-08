@@ -54,7 +54,7 @@ print hubtuple, ihubtuple, ' broadcast hub values from rank0 bcast to every rank
 amplitude=0.57
 delay=20
 duration=600
-if (hubtuple[0] in utils.celldict.keys():
+if hubtuple[0] in utils.celldict.keys():
     hubs.insert_cclamp(hubtuple[0],amplitude,delay,duration)
     print 'inserted Clamp'
 if ihubtuple[1] in utils.celldict.keys():

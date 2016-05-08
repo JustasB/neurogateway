@@ -128,13 +128,74 @@ class Utils():
         bothtrans=[i for j,i in enumerate(markram) if "pyramid" in i if (j<=2*(self.NCELL/3.0))]
         interneuron=[i for j,i in enumerate(markram) if "interneuron" in i ]   
         bothtrans.extend(interneuron[0:int(2*(self.NCELL/3.0))])
+        import platform
+        plat=platform.platform(aliased=0, terse=0)
+        print 'platform of NSG', plat 
+        if 'Darwin' in plat:
+            import btmorph
+            import os
+            cwd=os.getcwd()
+            btmorph.population_density_projection(destination=str(cwd), \
+            filter='*.swc', outN=str(cwd)+"/density.png", precision=[10, 10, 10],depth='Y')
+            #btmorph.plot_3D_SWC(filtered_fn)
+
         return bothtrans
             
     def make_cells(self,cell_list):
-        '''        Distribute cells across the hosts in a
+        '''
+        Distribute cells across the hosts in a
         Round robin distribution (circular dealing of cells)
         https://en.wikipedia.org/wiki/Round-robin
         '''
+        #import neuron
+        #from neuron import h    
+        coords = [0 for i in xrange(0,3)]#define list as a local variable.
+        h('objref py')
+        h('py = new PythonObject()')
+        NCELL=self.NCELL
+        SIZE=self.SIZE
+        RANK=self.RANK
+        pc=h.ParallelContext()
+        h('objref tvec, gidvec')
+        h('gidvec = new Vector()')
+        h('tvec = new Vector()')
+        assert len(cell_list)!=0
+        d = { x: y for x,y in enumerate(cell_list)} 
+        itergids = iter( (d[i][3],i) for i in range(RANK, NCELL, SIZE) )       
+        #Create a dictionary, where keys are soma centre coordinates to check for two cells occupying the same position.
+        #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.         
+        #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
+        #This would require an iterator such as the following.
+        for (j,i) in itergids:
+            has_cells=1#RANK specific attribute simplifies later code.
+            cell = h.mkcell(j)
+            self.names_list[i]=j
+            print cell, j,i 
+            cell.geom_nseg()
+            cell.gid1=i 
+            cell.name=j
+            # Populate the dictionary with appropriate keys for the sanity check.           
+            #excitatory neuron.
+            #self.test_cell(d[i])
+            if 'pyramid' in d[i]:                
+                cell.pyr()
+                cell.polarity=1                        
+            #inhibitory neuron.
+            else:                              
+                cell.basket()
+                cell.polarity=0           
+            #8 lines of trailing code is drawn from.
+            #http://neuron.yale.edu/neuron/static/docs/neuronpython/ballandstick5.html        
+            pc.set_gid2node(i,RANK)
+            nc = cell.connect2target(None)
+            pc.cell(i, nc) # Associate the cell with this host and gid
+            #### Record spikes of this cell
+            pc.spike_record(i, self.tvec, self.gidvec)        
+            assert None!=pc.gid2cell(i)
+            self.celldict[i]=cell
+            self.cells.append(cell)
+    
+    def plot_cell_centre(self,cell_list):
         import neuron
         from neuron import h    
         coords = [0 for i in xrange(0,3)]#define list as a local variable.
@@ -153,6 +214,9 @@ class Utils():
         #Create a dictionary, where keys are soma centre coordinates to check for two cells occupying the same position.
         #since dictionary keys have to be unique should throw error once two cell somas occupy exactly the same coordinates.         
         checkd={} 
+        plotx=[]
+        ploty=[]
+        plotz=[]
         #TODO keep rank0 free of cells, such that all the memory associated with that CPU is free for graph theory related objects.
         #This would require an iterator such as the following.
         for (j,i) in itergids:
@@ -167,6 +231,10 @@ class Utils():
            
             sec=cell.soma[0]        
             sec.push()
+            plotx.append(neuron.h.x3d(0))
+            ploty.append(neuron.h.y3d(0))
+            plotz.append(neuron.h.z3d(0))
+
             key_checkd=str(neuron.h.x3d(0))+str(neuron.h.y3d(0))+str(neuron.h.z3d(0))
             #Dictionary values may as well be the morphology SWC name, in case of a file that commits offensive duplicating of position.
             #Additionally I may as well make a plot of soma positions.
@@ -193,8 +261,46 @@ class Utils():
             assert None!=pc.gid2cell(i)
             self.celldict[i]=cell
             self.cells.append(cell)
-        checkd=None#Garbage collector will destroy but may as well explicitly dispose of the sanity check data.   
-    
+        import platform
+        plat=platform.platform(aliased=0, terse=0)
+        print 'platform of NSG', plat 
+        if 'Darwin' in plat:
+            import plotly.plotly as py
+            import plotly.graph_objs as go
+            trace1 = go.Scatter3d(
+                x=plotx,
+                y=ploty,
+                z=plotz,
+                mode='markers',
+                marker=dict(
+                    color='rgb(127, 127, 127)',
+                    size=12,
+                    symbol='circle',
+                    line=dict(
+                        color='rgb(204, 204, 204)',
+                        width=1
+                    ),
+                    opacity=0.9
+                )
+            )  
+            data=[trace1] 
+            layout = go.Layout(
+                margin=dict(
+                    l=0,
+                    r=0,
+                    b=0,
+                    t=0
+                )
+            )
+            fig = go.Figure(data=data, layout=layout)
+            plot_url = py.plot(fig, filename='soma centre positions')
+            from neuronvisio.controls import Controls
+            controls = Controls()
+        '''
+        TODO plot all of these cell centres in java script, and or plotly
+        import plotly    
+        '''
+        checkd=None
     def gcs(self,NCELL):
         '''
         Instantiate NEURON cell Objects in the Python variable space such
