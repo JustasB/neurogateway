@@ -1,3 +1,6 @@
+
+3Drodent stripped of dependencies such that it can run the [Neuroscience Gateway] (https://www.facebook.com/photo.php?fbid=226969161006304&set=a.107659599603928.1073741828.100010796645745&type=3&theater.)
+
 ##3Drodent:
 
 A parallel algorithm for distance dependent wiring of arbitrarily detailed neuron morphologies. Outputs from the algorithm facilitate the study of network activity in 3D networks, making it possible to observe contributions from neurite atrophy and growth in 3D neural networks. This model has been implemented as an extension of the Allen Brain SDK Utils class.
