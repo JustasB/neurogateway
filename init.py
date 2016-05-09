@@ -54,25 +54,29 @@ print hubtuple, ihubtuple, ' broadcast hub values from rank0 bcast to every rank
 amplitude=0.57
 delay=20
 duration=600
+hubs=NetStructure(utils,utils.ecm,utils.icm,utils.visited,utils.celldict)
+
 if hubtuple[0] in utils.celldict.keys():
     hubs.insert_cclamp(hubtuple[0],amplitude,delay,duration)
     print 'inserted Clamp'
 if ihubtuple[1] in utils.celldict.keys():
     hubs.insert_cclamp(ihubtuple[1],amplitude,delay,duration)
     print 'inserted Clamp'
-
-hubs=NetStructure(utils,utils.ecm,utils.icm,utils.visited,utils.celldict)
-(outdegreei,indegreei)=hubs.hubs(utils.global_icm)    
-(outdegree,indegree)=hubs.hubs(utils.global_ecm)    
+    
+#Find and stimulate the local hubs too.
+#Inhibitory
+(outdegreei,indegreei)=hubs.hubs(utils.icm)    
+#excitatory
+(outdegree,indegree)=hubs.hubs(utils.ecm)    
 # A local analysis of hub nodes, using local incomplete adjacency matrices.
 amplitude=0.27 #pA or nA?
 delay=15# was 1020.0 ms, as this was long enough to notice unusual rebound spiking
 duration=500.0 #was 750 ms, however this was much too long.
-hubs.insert_cclamp(outdegreei,indegreei,amplitude,delay,duration)
+hubs.insert_cclamp(outdegreei,amplitude,delay,duration)
 amplitude=0.27 #pA or nA?
 delay=200# was 1020.0 ms, as this was long enough to notice unusual rebound spiking
 duration=1000.0 #was 750 ms, however this was much too long.
-hubs.insert_cclamp(hubs.outdegree,hubs.indegree,amplitude,delay,duration)
+hubs.insert_cclamp(hubs.outdegree,amplitude,delay,duration)
 if utils.COMM.rank!=0:
     vec = utils.record_values()
 print 'setup recording'

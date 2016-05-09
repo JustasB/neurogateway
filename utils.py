@@ -781,6 +781,7 @@ class Utils():
         d =[]
         whole=self.global_ecm+self.global_icm
         d.append(whole.tolist()) 
+        self.cell_info_gather()
         d.append(self.global_namedict)
         json.dump(d, open('web/js/global_whole_network.json','w'))
         d=json.load(open('web/js/global_whole_network.json','r'))
