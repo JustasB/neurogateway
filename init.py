@@ -62,7 +62,8 @@ if hubtuple[0] in utils.celldict.keys():
 if ihubtuple[1] in utils.celldict.keys():
     hubs.insert_cclamp(ihubtuple[1],amplitude,delay,duration)
     print 'inserted Clamp'
-    
+'''
+#This code seems to hang I do not know why    
 #Find and stimulate the local hubs too.
 #Inhibitory
 (outdegreei,indegreei)=hubs.hubs(utils.icm)    
@@ -77,12 +78,15 @@ amplitude=0.27 #pA or nA?
 delay=200# was 1020.0 ms, as this was long enough to notice unusual rebound spiking
 duration=1000.0 #was 750 ms, however this was much too long.
 hubs.insert_cclamp(hubs.outdegree,amplitude,delay,duration)
+'''
+
 if utils.COMM.rank!=0:
     vec = utils.record_values()
 print 'setup recording'
 tstop = 13570
 utils.COMM.barrier()
 utils.prun(tstop)
+
 if utils.COMM.rank==0:
     vec={}
 utils.global_vec = utils.COMM.gather(vec,root=0) # Results in a list of dictionaries on rank 0 called utils.global_vec
